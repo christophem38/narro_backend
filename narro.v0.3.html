@@ -1,0 +1,2216 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Narro - Tableau de bord</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Google Fonts: Plus Jakarta Sans -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2 family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- GSAP (GreenSock Animation Platform) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['"Plus Jakarta Sans"', 'sans-serif'],
+                    },
+                    colors: {
+                        primary: '#4F46E5', // Indigo 600
+                        primary_hover: '#4338CA', // Indigo 700
+                        secondary: '#8B5CF6', // Violet 500
+                        surface: '#ffffff',
+                        background: '#F8FAFC', // Slate 50
+                    },
+                    boxShadow: {
+                        'soft': '0 4px 20px -2px rgba(0, 0, 0, 0.04)',
+                        'glow': '0 0 20px rgba(79, 70, 229, 0.15)',
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body { 
+            background-color: #F8FAFC; 
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+        
+        .view-section { 
+            display: none; 
+        }
+        
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+        /* Toast notification styling */
+        #toast-container {
+            position: fixed; bottom: 20px; right: 20px; z-index: 100;
+            display: flex; flex-direction: column; gap: 10px;
+        }
+        .toast {
+            background: rgba(15, 23, 42, 0.95); backdrop-filter: blur(8px);
+            color: white; padding: 14px 24px; border-radius: 12px;
+            box-shadow: 0 10px 25px -5px rgba(0,0,0,0.2); font-size: 14px;
+            font-weight: 500; border: 1px solid rgba(255,255,255,0.1);
+        }
+        
+        .hide-scrollbar::-webkit-scrollbar { display: none; }
+        .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+        /* Drag and drop classes */
+        .drag-over { border-color: #4F46E5 !important; background-color: rgba(79, 70, 229, 0.05) !important; }
+        .draggable-item { cursor: grab; }
+        .draggable-item:active { cursor: grabbing; }
+
+        /* Direct editable styles */
+        [contenteditable="true"]:focus {
+            outline: none;
+            background-color: rgba(79, 70, 229, 0.03);
+            border-color: #4F46E5 !important;
+            box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+        }
+
+        /* Mockup Edit Mode styles */
+        .editable-maquette-active {
+            outline: 1px dashed #8B5CF6 !important;
+            outline-offset: 2px !important;
+            cursor: text !important;
+        }
+        .editable-maquette-active:hover {
+            background-color: rgba(139, 92, 246, 0.05) !important;
+        }
+    </style>
+</head>
+<body class="text-slate-800 h-screen overflow-hidden flex flex-col md:flex-row relative">
+
+    <div id="toast-container"></div>
+
+    <!-- FLOATING MOCKUP TOOLS PANEL -->
+    <div id="mockup-tools-panel" class="fixed bottom-6 right-6 z-50 flex items-center gap-3 bg-slate-900/95 backdrop-blur-md px-5 py-3 rounded-2xl border border-slate-700 shadow-2xl transition-all">
+        <div class="flex items-center gap-2 border-r border-slate-700 pr-3 mr-1">
+            <span class="w-2.5 h-2.5 rounded-full bg-indigo-500 animate-pulse"></span>
+            <span class="text-[11px] font-extrabold uppercase tracking-wider text-slate-300">Outils Maquette</span>
+        </div>
+        <button id="btn-toggle-edit-mode" onclick="toggleEditMode()" class="px-4 py-2.5 rounded-xl text-xs font-extrabold bg-slate-800 text-white hover:bg-slate-700 transition-all flex items-center gap-2 shadow-sm whitespace-nowrap">
+            <i class="fa-solid fa-pen-to-square text-indigo-400"></i> Éditer les verbatims (Maquette)
+        </button>
+        <button onclick="exportEditedHTML()" class="px-4 py-2.5 rounded-xl text-xs font-extrabold bg-gradient-to-r from-emerald-500 to-teal-600 text-white hover:opacity-90 transition-all flex items-center gap-2 shadow-sm whitespace-nowrap">
+            <i class="fa-solid fa-download"></i> Exporter la maquette (.html)
+        </button>
+    </div>
+
+    <!-- LEFT NAVIGATION SIDEBAR (Plein écran sur grand écran, haut sur mobile) -->
+    <aside class="w-full md:w-64 bg-white border-b md:border-b-0 md:border-r border-slate-200/60 flex flex-col h-auto md:h-screen flex-shrink-0 z-40 shadow-sm justify-between">
+        <div class="flex flex-col flex-1">
+            <!-- Logo Section -->
+            <div class="h-16 flex items-center gap-3 px-6 border-b border-slate-100 cursor-pointer shrink-0" onclick="switchTab('weekly')">
+                <div class="w-8 h-8 rounded-xl bg-gradient-to-br from-primary to-secondary flex items-center justify-center text-white shadow-glow">
+                    <i class="fa-solid fa-bolt"></i>
+                </div>
+                <div class="flex flex-col">
+                    <span class="text-xl font-extrabold tracking-tight text-slate-900 leading-tight">
+                        Nar<span class="text-transparent bg-clip-text bg-gradient-to-r from-primary to-secondary">ro</span>
+                    </span>
+                    <span class="text-[9px] font-bold text-slate-400 tracking-wider uppercase leading-none">Ne partez plus jamais d'une page blanche</span>
+                </div>
+            </div>
+
+            <!-- Vertical Menu Items -->
+            <nav class="p-4 space-y-1.5 flex-1 overflow-y-auto">
+                <a href="#" onclick="switchTab('weekly')" id="nav-weekly" class="nav-item group flex items-center gap-3 px-4 py-3 text-sm font-bold rounded-xl transition-all text-slate-500 hover:text-slate-900 hover:bg-slate-50">
+                    <i class="fa-solid fa-calendar-week text-lg text-slate-400 group-hover:text-primary transition-colors"></i> Suggestions
+                </a>
+                
+                <a href="#" onclick="switchTab('easypost')" id="nav-easypost" class="nav-item group flex items-center gap-3 px-4 py-3 text-sm font-bold rounded-xl transition-all text-slate-500 hover:text-slate-900 hover:bg-slate-50">
+                    <i class="fa-solid fa-wand-magic-sparkles text-lg text-slate-400 group-hover:text-primary transition-colors"></i> Easy Post
+                </a>
+                
+                <a href="#" onclick="switchTab('yourposts')" id="nav-yourposts" class="nav-item group flex items-center gap-3 px-4 py-3 text-sm font-bold rounded-xl transition-all text-slate-500 hover:text-slate-900 hover:bg-slate-50">
+                    <i class="fa-solid fa-flask text-lg text-slate-400 group-hover:text-primary transition-colors"></i> Le Labo (Your Posts)
+                </a>
+                
+                <a href="#" onclick="switchTab('events')" id="nav-events" class="nav-item group flex items-center gap-3 px-4 py-3 text-sm font-bold rounded-xl transition-all text-slate-500 hover:text-slate-900 hover:bg-slate-50">
+                    <i class="fa-solid fa-ticket text-lg text-slate-400 group-hover:text-primary transition-colors"></i> Événements
+                </a>
+
+                <a href="#" onclick="switchTab('analytics')" id="nav-analytics" class="nav-item group flex items-center gap-3 px-4 py-3 text-sm font-bold rounded-xl transition-all text-slate-500 hover:text-slate-900 hover:bg-slate-50">
+                    <i class="fa-solid fa-chart-line text-lg text-slate-400 group-hover:text-primary transition-colors"></i> Suivi & Stratégie
+                </a>
+            </nav>
+        </div>
+
+        <!-- Profil / Configuration Area at Bottom of Sidebar -->
+        <div class="p-4 border-t border-slate-100 shrink-0 bg-slate-50/50">
+            <button onclick="switchTab('account')" id="nav-account" class="nav-item w-full flex items-center gap-3 p-2.5 rounded-xl hover:bg-white border border-transparent hover:border-slate-100 transition-all text-left group">
+                <div class="w-10 h-10 rounded-full bg-slate-100 border-2 border-transparent group-hover:border-secondary transition-all flex items-center justify-center text-slate-400 overflow-hidden shadow-sm">
+                    <i class="fa-solid fa-user text-slate-400 text-lg group-hover:text-secondary transition-colors"></i>
+                </div>
+                <div class="flex-1 min-w-0">
+                    <p class="text-sm font-bold text-slate-800 truncate">Votre Profil</p>
+                    <p class="text-[11px] font-medium text-slate-400 truncate">Configuration & Style</p>
+                </div>
+                <i class="fa-solid fa-gear text-slate-400 group-hover:text-slate-600 transition-colors text-sm pr-1"></i>
+            </button>
+        </div>
+    </aside>
+
+    <!-- MAIN CONTENT AREA (Scrollable, occupant toute la hauteur disponible) -->
+    <main class="flex-1 overflow-y-auto p-4 md:p-8 w-full h-full">
+        <div class="max-w-4xl mx-auto pb-10">
+
+            <!-- ========================================== -->
+            <!-- VIEW 1 : Suggestions                      -->
+            <!-- ========================================== -->
+            <div id="view-weekly" class="view-section">
+                <div class="mb-8 section-anim flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div>
+                        <h1 class="text-3xl font-extrabold text-slate-900 mb-2 tracking-tight">Vos suggestions de la semaine</h1>
+                        <p class="text-slate-500 font-medium">Éditez votre texte en direct, validez, et l'IA s'occupe du reste.</p>
+                    </div>
+                    
+                    <!-- SÉLECTEUR DE SEMAINE -->
+                    <div class="flex items-center gap-2 bg-white border border-slate-200 p-1.5 rounded-2xl shadow-sm shrink-0 self-start md:self-center">
+                        <button onclick="navigateWeek(-1)" class="w-10 h-10 rounded-xl hover:bg-slate-50 flex items-center justify-center text-slate-600 transition-colors" title="Semaine précédente">
+                            <i class="fa-solid fa-chevron-left text-sm"></i>
+                        </button>
+                        <div class="px-3 text-center min-w-[210px]">
+                            <p id="week-display-title" class="text-sm font-extrabold text-slate-800 leading-tight">Cette semaine</p>
+                            <p id="week-display-range" class="text-[11px] font-semibold text-slate-400 mt-0.5">08 Juin - 14 Juin 2026</p>
+                        </div>
+                        <button id="btn-next-week" onclick="navigateWeek(1)" class="w-10 h-10 rounded-xl hover:bg-slate-50 flex items-center justify-center text-slate-600 transition-colors opacity-40 cursor-not-allowed" disabled title="Semaine suivante">
+                            <i class="fa-solid fa-chevron-right text-sm"></i>
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- CONTAINER DES CARTES HEBDOMADAIRES DYNAMIQUES -->
+                <div id="weekly-posts-container" class="space-y-6">
+                    <!-- Généré dynamiquement en JS (renderWeeklyPosts) -->
+                </div>
+
+                <!-- Active Configuration Info Box -->
+                <div class="mt-8 bg-slate-50/80 border border-slate-200 rounded-2xl p-5 flex flex-col md:flex-row items-center justify-between gap-4 section-anim shadow-sm">
+                    <div class="flex items-center gap-4">
+                        <div class="w-10 h-10 rounded-full bg-white flex items-center justify-center text-slate-400 shadow-sm border border-slate-100">
+                            <i class="fa-solid fa-sliders text-indigo-500"></i>
+                        </div>
+                        <div>
+                            <h3 class="text-sm font-bold text-slate-800">Moteur de génération actif</h3>
+                            <p class="text-xs text-slate-500 font-medium">Vos posts hebdomadaires découlent de votre ligne de ciblage paramétrée :</p>
+                        </div>
+                    </div>
+                    <div class="flex flex-wrap gap-2 items-center">
+                        <span class="px-2.5 py-1 bg-white border border-slate-200 text-slate-600 rounded-lg text-xs font-bold shadow-sm"><i class="fa-solid fa-hashtag text-primary/50 mr-1"></i>IA</span>
+                        <span class="px-2.5 py-1 bg-white border border-slate-200 text-slate-600 rounded-lg text-xs font-bold shadow-sm"><i class="fa-solid fa-hashtag text-primary/50 mr-1"></i>SaaS B2B</span>
+                        <span class="px-2.5 py-1 bg-white border border-slate-200 text-slate-600 rounded-lg text-xs font-bold shadow-sm"><i class="fa-solid fa-user-tag text-secondary/50 mr-1"></i>@MarcSimon</span>
+                        <button onclick="switchTab('account')" class="ml-2 text-xs font-bold text-primary hover:text-primary_hover underline underline-offset-2 transition-colors">Ajuster la ligne éditoriale</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ========================================== -->
+            <!-- VIEW 2 : EASY POST (Générateur Express)    -->
+            <!-- ========================================== -->
+            <div id="view-easypost" class="view-section">
+                <div class="mb-8 section-anim">
+                    <h1 class="text-3xl font-extrabold text-slate-900 mb-2 tracking-tight">Easy Post <span class="text-transparent bg-clip-text bg-gradient-to-r from-amber-400 to-orange-500">⚡</span></h1>
+                    <p class="text-slate-500 font-medium">Un événement imprévu ? Une réflexion ? Laissez l'IA mettre en forme vos idées.</p>
+                </div>
+
+                <!-- Modèles Rapides (Grille de 3x3 = 9 choix, 1/3 largeur) -->
+                <div class="grid grid-cols-2 md:grid-cols-3 gap-3 mb-8 section-anim">
+                    <button onclick="fillGenerator('succes', this)" class="template-btn p-3 bg-white border border-slate-100 rounded-xl shadow-soft hover:shadow-md hover:border-primary/30 transition-all text-left flex items-center gap-3 group focus:outline-none relative overflow-hidden">
+                        <div class="absolute top-0 right-0 w-12 h-12 bg-emerald-500/5 rounded-bl-full -z-10 group-hover:scale-150 transition-transform duration-500"></div>
+                        <div class="w-10 h-10 shrink-0 rounded-lg bg-emerald-50 text-emerald-500 flex items-center justify-center text-lg group-hover:scale-110 group-hover:rotate-6 transition-transform shadow-sm">🏆</div>
+                        <div class="overflow-hidden">
+                            <h3 class="font-bold text-slate-800 text-sm truncate">Succès</h3>
+                            <p class="text-[11px] text-slate-500 font-medium mt-0.5 truncate">Nouveau client...</p>
+                        </div>
+                    </button>
+                    <button onclick="fillGenerator('opinion', this)" class="template-btn p-3 bg-white border border-slate-100 rounded-xl shadow-soft hover:shadow-md hover:border-primary/30 transition-all text-left flex items-center gap-3 group focus:outline-none relative overflow-hidden">
+                        <div class="absolute top-0 right-0 w-12 h-12 bg-orange-500/5 rounded-bl-full -z-10 group-hover:scale-150 transition-transform duration-500"></div>
+                        <div class="w-10 h-10 shrink-0 rounded-lg bg-orange-50 text-orange-500 flex items-center justify-center text-lg group-hover:scale-110 group-hover:-rotate-6 transition-transform shadow-sm">💡</div>
+                        <div class="overflow-hidden">
+                            <h3 class="font-bold text-slate-800 text-sm truncate">Opinion</h3>
+                            <p class="text-[11px] text-slate-500 font-medium mt-0.5 truncate">Prendre position</p>
+                        </div>
+                    </button>
+                    <button onclick="fillGenerator('event', this)" class="template-btn p-3 bg-white border border-slate-100 rounded-xl shadow-soft hover:shadow-md hover:border-primary/30 transition-all text-left flex items-center gap-3 group focus:outline-none relative overflow-hidden">
+                        <div class="absolute top-0 right-0 w-12 h-12 bg-blue-500/5 rounded-bl-full -z-10 group-hover:scale-150 transition-transform duration-500"></div>
+                        <div class="w-10 h-10 shrink-0 rounded-lg bg-blue-50 text-primary flex items-center justify-center text-lg group-hover:scale-110 group-hover:rotate-6 transition-transform shadow-sm">🎪</div>
+                        <div class="overflow-hidden">
+                            <h3 class="font-bold text-slate-800 text-sm truncate">Événement</h3>
+                            <p class="text-[11px] text-slate-500 font-medium mt-0.5 truncate">Debrief de salon</p>
+                        </div>
+                    </button>
+                    <button onclick="fillGenerator('recrutement', this)" class="template-btn p-3 bg-white border border-slate-100 rounded-xl shadow-soft hover:shadow-md hover:border-primary/30 transition-all text-left flex items-center gap-3 group focus:outline-none relative overflow-hidden">
+                        <div class="absolute top-0 right-0 w-12 h-12 bg-purple-500/5 rounded-bl-full -z-10 group-hover:scale-150 transition-transform duration-500"></div>
+                        <div class="w-10 h-10 shrink-0 rounded-lg bg-purple-50 text-secondary flex items-center justify-center text-lg group-hover:scale-110 group-hover:-rotate-6 transition-transform shadow-sm">🤝</div>
+                        <div class="overflow-hidden">
+                            <h3 class="font-bold text-slate-800 text-sm truncate">Recrutement</h3>
+                            <p class="text-[11px] text-slate-500 font-medium mt-0.5 truncate">Attirer des talents</p>
+                        </div>
+                    </button>
+                    <button onclick="fillGenerator('apprentissage', this)" class="template-btn p-3 bg-white border border-slate-100 rounded-xl shadow-soft hover:shadow-md hover:border-primary/30 transition-all text-left flex items-center gap-3 group focus:outline-none relative overflow-hidden">
+                        <div class="absolute top-0 right-0 w-12 h-12 bg-rose-500/5 rounded-bl-full -z-10 group-hover:scale-150 transition-transform duration-500"></div>
+                        <div class="w-10 h-10 shrink-0 rounded-lg bg-rose-50 text-rose-500 flex items-center justify-center text-lg group-hover:scale-110 group-hover:rotate-6 transition-transform shadow-sm">📉</div>
+                        <div class="overflow-hidden">
+                            <h3 class="font-bold text-slate-800 text-sm truncate">Leçon / Échec</h3>
+                            <p class="text-[11px] text-slate-500 font-medium mt-0.5 truncate">Partager une erreur</p>
+                        </div>
+                    </button>
+                    <button onclick="fillGenerator('coulisses', this)" class="template-btn p-3 bg-white border border-slate-100 rounded-xl shadow-soft hover:shadow-md hover:border-primary/30 transition-all text-left flex items-center gap-3 group focus:outline-none relative overflow-hidden">
+                        <div class="absolute top-0 right-0 w-12 h-12 bg-slate-500/5 rounded-bl-full -z-10 group-hover:scale-150 transition-transform duration-500"></div>
+                        <div class="w-10 h-10 shrink-0 rounded-lg bg-slate-100 text-slate-600 flex items-center justify-center text-lg group-hover:scale-110 group-hover:-rotate-6 transition-transform shadow-sm">👀</div>
+                        <div class="overflow-hidden">
+                            <h3 class="font-bold text-slate-800 text-sm truncate">Coulisses</h3>
+                            <p class="text-[11px] text-slate-500 font-medium mt-0.5 truncate">La vie au bureau</p>
+                        </div>
+                    </button>
+                    <button onclick="fillGenerator('equipe', this)" class="template-btn p-3 bg-white border border-slate-100 rounded-xl shadow-soft hover:shadow-md hover:border-primary/30 transition-all text-left flex items-center gap-3 group focus:outline-none relative overflow-hidden">
+                        <div class="absolute top-0 right-0 w-12 h-12 bg-teal-500/5 rounded-bl-full -z-10 group-hover:scale-150 transition-transform duration-500"></div>
+                        <div class="w-10 h-10 shrink-0 rounded-lg bg-teal-50 text-teal-500 flex items-center justify-center text-lg group-hover:scale-110 group-hover:rotate-6 transition-transform shadow-sm">🙌</div>
+                        <div class="overflow-hidden">
+                            <h3 class="font-bold text-slate-800 text-sm truncate">Équipe</h3>
+                            <p class="text-[11px] text-slate-500 font-medium mt-0.5 truncate">Mettre en avant</p>
+                        </div>
+                    </button>
+                    <button onclick="fillGenerator('lancement', this)" class="template-btn p-3 bg-white border border-slate-100 rounded-xl shadow-soft hover:shadow-md hover:border-primary/30 transition-all text-left flex items-center gap-3 group focus:outline-none relative overflow-hidden">
+                        <div class="absolute top-0 right-0 w-12 h-12 bg-indigo-500/5 rounded-bl-full -z-10 group-hover:scale-150 transition-transform duration-500"></div>
+                        <div class="w-10 h-10 shrink-0 rounded-lg bg-indigo-50 text-primary flex items-center justify-center text-lg group-hover:scale-110 group-hover:-rotate-6 transition-transform shadow-sm">🚀</div>
+                        <div class="overflow-hidden">
+                            <h3 class="font-bold text-slate-800 text-sm truncate">Lancement</h3>
+                            <p class="text-[11px] text-slate-500 font-medium mt-0.5 truncate">Produit ou feature</p>
+                        </div>
+                    </button>
+                    <button onclick="fillGenerator('gueule', this)" class="template-btn p-3 bg-white border border-slate-100 rounded-xl shadow-soft hover:shadow-md hover:border-primary/30 transition-all text-left flex items-center gap-3 group focus:outline-none relative overflow-hidden">
+                        <div class="absolute top-0 right-0 w-12 h-12 bg-red-500/5 rounded-bl-full -z-10 group-hover:scale-150 transition-transform duration-500"></div>
+                        <div class="w-10 h-10 shrink-0 rounded-lg bg-red-50 text-red-500 flex items-center justify-center text-lg group-hover:scale-110 group-hover:rotate-6 transition-transform shadow-sm">📢</div>
+                        <div class="overflow-hidden">
+                            <h3 class="font-bold text-slate-800 text-sm truncate">Coup de gueule</h3>
+                            <p class="text-[11px] text-slate-500 font-medium mt-0.5 truncate">Ce qui vous agace</p>
+                        </div>
+                    </button>
+                </div>
+
+                <div class="bg-white p-6 md:p-8 rounded-3xl border border-slate-100 shadow-soft relative overflow-hidden section-anim">
+                    <div class="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-primary via-secondary to-pink-500"></div>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-10 items-start mt-2">
+                        <!-- Form Area -->
+                        <div>
+                            <h2 class="text-xl font-extrabold text-slate-800 mb-6 flex items-center gap-3">
+                                <div class="p-2 bg-slate-50 rounded-lg"><i class="fa-solid fa-keyboard text-primary"></i></div> 
+                                Donnez-moi juste l'essentiel
+                            </h2>
+                            <div class="mb-6">
+                                <label id="label-q1" class="block text-sm font-bold text-slate-700 mb-2">1. De quoi voulez-vous parler ?</label>
+                                <input type="text" id="input-q1" placeholder="Ex: Signature d'un gros contrat..." class="w-full px-5 py-3.5 rounded-xl border border-slate-200 focus:ring-4 focus:ring-primary/10 focus:border-primary outline-none transition-all text-[15px] bg-slate-50 focus:bg-white font-medium shadow-inner shadow-slate-100/50">
+                            </div>
+                            <div class="mb-6">
+                                <label id="label-q2" class="block text-sm font-bold text-slate-700 mb-2">2. Quelle est votre idea forte ?</label>
+                                <textarea id="input-q2" rows="3" placeholder="Ex: Fierté des équipes après 6 mois d'efforts intenses." class="w-full px-5 py-3.5 rounded-xl border border-slate-200 focus:ring-4 focus:ring-primary/10 focus:border-primary outline-none transition-all text-[15px] resize-none bg-slate-50 focus:bg-white font-medium shadow-inner shadow-slate-100/50"></textarea>
+                            </div>
+                            <div class="mb-8">
+                                <label class="block text-sm font-bold text-slate-700 mb-3">3. Quel ton adopter ?</label>
+                                <div class="flex flex-wrap gap-2" id="easypost-tone-selector">
+                                    <button onclick="setEasyPostTone(this)" class="tone-btn px-5 py-2.5 rounded-xl border-2 border-primary bg-indigo-50 text-primary text-sm font-bold shadow-sm">Expert</button>
+                                    <button onclick="setEasyPostTone(this)" class="tone-btn px-5 py-2.5 rounded-xl border-2 border-slate-100 hover:border-slate-200 hover:bg-slate-50 text-slate-500 text-sm font-bold transition-all">Enthousiaste</button>
+                                    <button onclick="setEasyPostTone(this)" class="tone-btn px-5 py-2.5 rounded-xl border-2 border-slate-100 hover:border-slate-200 hover:bg-slate-50 text-slate-500 text-sm font-bold transition-all">Provocateur</button>
+                                </div>
+                            </div>
+                            <button onclick="simulateGeneration()" id="btn-generate" class="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold py-4 rounded-xl transition-all duration-300 flex items-center justify-center gap-3 shadow-[0_10px_20px_rgba(15,23,42,0.15)] hover:shadow-[0_10px_25px_rgba(15,23,42,0.25)] hover:-translate-y-1">
+                                <i class="fa-solid fa-wand-magic-sparkles text-amber-400"></i> Rédiger mon post
+                            </button>
+                        </div>
+
+                        <!-- Result Area -->
+                        <div class="h-full flex flex-col justify-between">
+                            <!-- Placeholder Before Generation -->
+                            <div id="gen-placeholder" class="h-full min-h-[420px] border-2 border-dashed border-slate-200 rounded-3xl flex flex-col items-center justify-center text-center p-8 bg-slate-50/50">
+                                <div class="w-20 h-20 bg-white rounded-2xl flex items-center justify-center text-3xl text-slate-300 shadow-soft mb-6 rotate-3">
+                                    <i class="fa-solid fa-pen-nib"></i>
+                                </div>
+                                <h3 class="text-lg font-bold text-slate-700 mb-2">Prêt à écrire</h3>
+                                <p class="text-slate-500 font-medium text-sm max-w-[200px]">Remplissez les champs à gauche, la magie opère ici.</p>
+                            </div>
+
+                            <!-- Generated Result (Hidden initially) -->
+                            <div id="gen-result" class="hidden h-full flex flex-col">
+                                <div class="bg-white rounded-t-3xl border border-slate-200 border-b-0 p-6 flex-1 shadow-soft relative overflow-hidden flex flex-col">
+                                    <div class="absolute top-0 right-0 w-24 h-24 bg-gradient-to-br from-primary/5 to-secondary/5 rounded-bl-full -z-10"></div>
+                                    <div class="flex items-center gap-3 mb-5 pb-5 border-b border-slate-100 flex-shrink-0">
+                                        <div class="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 text-xl border-2 border-white shadow-sm"><i class="fa-solid fa-user"></i></div>
+                                        <div>
+                                            <p class="text-[15px] font-extrabold text-slate-900 leading-tight">Votre Profil</p>
+                                            <p class="text-[13px] font-medium text-slate-500 leading-tight mt-0.5">Directeur</p>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Editable Div Area -->
+                                    <div class="flex-1 flex flex-col justify-between">
+                                        <div id="easypost-rendered-text" contenteditable="true" oninput="updateEasyPostWordCount()" class="text-[15px] font-medium text-slate-700 leading-relaxed whitespace-pre-line post-content-container focus:outline-none focus:ring-2 focus:ring-primary/20 focus:bg-slate-50/30 p-3 rounded-xl border border-transparent focus:border-slate-200 transition-all cursor-text flex-1 overflow-y-auto">De retour de Vivatech, et le constat est sans appel. 🚀
+
+On parle beaucoup d'Intelligence Artificielle, on voit des démonstrations bluffantes... mais où sont les vrais cas d'usage industriels ? 
+
+J'ai vu beaucoup de "gadgets" et très peu de solutions capables de transformer structurellement la production. L'innovation pour l'innovation ne suffit plus. 
+
+C'est là que nous nous différencions. Arrêtons les Proof of Concepts. Passons au déploiement. 
+Qui d'autre a eu cette impression ? 👇
+
+#Vivatech #IA #Industrie</div>
+                                        
+                                        <!-- Editable Indicators + Live Word Count -->
+                                        <div class="flex justify-between items-center mt-3 pt-3 border-t border-slate-100 text-xs text-slate-400 font-semibold px-1 flex-shrink-0">
+                                            <span class="flex items-center gap-1.5"><i class="fa-solid fa-pen text-slate-300"></i> Zone modifiable en direct</span>
+                                            <span id="easypost-word-count" class="bg-indigo-50 text-primary px-2 py-1 rounded-md font-bold">88 mots</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="bg-slate-50 p-4 border border-slate-200 rounded-b-3xl flex justify-between items-center gap-3 shadow-inner shadow-slate-100">
+                                    <button onclick="openEditor('easypost-rendered-text')" class="px-4 py-3 text-sm font-bold text-slate-500 hover:text-slate-700 bg-white border border-slate-200 rounded-xl shadow-sm transition-all">
+                                        <i class="fa-solid fa-pen-nib"></i> Focus
+                                    </button>
+                                    <button onclick="triggerPublishModal('Post Express - Easy Post', 'easypost-rendered-text', 'Créatif', 'Inconnu')" class="flex-1 py-3 text-sm font-bold text-white bg-gradient-to-r from-primary to-secondary hover:shadow-glow rounded-xl transition-all transform hover:-translate-y-0.5 flex items-center justify-center gap-2">
+                                        <i class="fa-solid fa-paper-plane"></i> Poster
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ========================================== -->
+            <!-- VIEW 3 : YOUR POSTS (Le Labo de création)  -->
+            <!-- ========================================== -->
+            <div id="view-yourposts" class="view-section">
+                <div class="mb-6 section-anim">
+                    <h1 class="text-3xl font-extrabold text-slate-900 mb-2 tracking-tight">Le Labo de création 🧪</h1>
+                    <p class="text-slate-500 font-medium">Sélectionnez vos sources, affinez vos réglages et générez vos posts originaux.</p>
+                </div>
+
+                <!-- SELECTEUR DE SEMAINE SPECIFIQUE POUR LES SOURCES -->
+                <div class="mb-4 section-anim flex items-center justify-between bg-slate-100/70 border border-slate-200 p-3 rounded-2xl shadow-sm">
+                    <span class="text-xs font-extrabold text-slate-700 uppercase tracking-wider pl-2 flex items-center gap-1.5">
+                        <i class="fa-solid fa-clock-rotate-left text-primary animate-pulse"></i> Historique de vos sources
+                    </span>
+                    <div class="flex items-center gap-2 shrink-0">
+                        <button onclick="navigateLabWeek(-1)" class="w-8 h-8 rounded-lg bg-white border border-slate-200 hover:border-primary/50 flex items-center justify-center text-slate-600 hover:text-primary transition-all shadow-sm" title="Semaine précédente">
+                            <i class="fa-solid fa-chevron-left text-xs"></i>
+                        </button>
+                        <span id="lab-week-display-title" class="text-xs font-extrabold text-slate-800 min-w-[140px] text-center">Cette semaine</span>
+                        <button id="btn-next-lab-week" onclick="navigateLabWeek(1)" class="w-8 h-8 rounded-lg bg-white border border-slate-200 hover:border-primary/50 flex items-center justify-center text-slate-600 hover:text-primary transition-all shadow-sm opacity-40 cursor-not-allowed" disabled title="Semaine suivante">
+                            <i class="fa-solid fa-chevron-right text-xs"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Section Drag & Drop : Sources en 2 colonnes larges avec scrollers verticaux -->
+                <div class="mb-6 section-anim">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        
+                        <!-- Colonne 1 : News du Secteur avec scrollbar verticale -->
+                        <div class="bg-white rounded-2xl border border-slate-100 shadow-soft p-5 flex flex-col h-[380px]">
+                            <h3 class="text-sm font-extrabold text-slate-800 mb-3 flex items-center gap-2 uppercase tracking-wider">
+                                <i class="fa-regular fa-newspaper text-primary"></i> News du Secteur
+                            </h3>
+                            <!-- CONTAINER DYNAMIQUE SCROLLABLE -->
+                            <div id="lab-news-container" class="overflow-y-auto pr-2 space-y-3 flex-1">
+                                <!-- Généré dynamiquement en JS (renderLabSources) -->
+                            </div>
+                        </div>
+
+                        <!-- Colonne 2 : Personnes suivies avec scrollbar verticale -->
+                        <div class="bg-white rounded-2xl border border-slate-100 shadow-soft p-5 flex flex-col h-[380px]">
+                            <h3 class="text-sm font-extrabold text-slate-800 mb-3 flex items-center gap-2 uppercase tracking-wider">
+                                <i class="fa-solid fa-users text-secondary"></i> Réseau & Influences
+                            </h3>
+                            <!-- CONTAINER DYNAMIQUE SCROLLABLE -->
+                            <div id="lab-influences-container" class="overflow-y-auto pr-2 space-y-3 flex-1">
+                                <!-- Généré dynamiquement en JS (renderLabSources) -->
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+
+                <!-- Le Bac d'assemblage (Plein écran horizontal) -->
+                <div class="mb-6 section-anim bg-slate-900 rounded-2xl border border-slate-800 shadow-lg p-6 relative overflow-hidden group w-full">
+                    <div class="absolute inset-0 bg-gradient-to-br from-primary/10 to-secondary/10 opacity-50"></div>
+                    <h3 class="text-sm font-extrabold text-white mb-3 flex items-center gap-2 uppercase tracking-wider relative z-10">
+                        <i class="fa-solid fa-inbox text-amber-400"></i> Le Bac d'assemblage
+                    </h3>
+                    <div id="drop-bucket" class="min-h-[120px] border-2 border-dashed border-slate-700 rounded-xl bg-slate-800/80 relative z-10 p-4 flex flex-wrap gap-3 transition-all items-center justify-center" ondrop="drop(event)" ondragover="allowDrop(event)" ondragleave="leaveDrop(event)">
+                        <div id="bucket-placeholder" class="absolute inset-0 flex items-center justify-center text-slate-400 pointer-events-none opacity-60 gap-3">
+                            <i class="fa-solid fa-arrow-down-long text-xl animate-bounce text-slate-500"></i>
+                            <p class="text-sm font-bold text-center">Glissez et déposez vos sources ici</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Zone de Configuration Avancée : Angle, Posture et Longueur -->
+                <div class="bg-white rounded-2xl border border-slate-100 shadow-soft p-6 mb-6 section-anim">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                        
+                        <!-- Zone Gauche : Angle sélectionné -->
+                        <div>
+                            <label class="block text-sm font-bold text-slate-700 mb-3 flex items-center gap-2">
+                                <i class="fa-solid fa-compass text-primary"></i> 1. Définir ou choisir un angle
+                            </label>
+                            <div class="space-y-3">
+                                <input type="text" id="bucket-angle-input" placeholder="Ex: Mettre en garde contre le retard d'adoption ou proposer une alternative..." class="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm font-semibold outline-none focus:ring-4 focus:ring-primary/10 focus:border-primary bg-slate-50 focus:bg-white transition-all">
+                                <div class="flex flex-wrap gap-2">
+                                    <button onclick="selectAngle('Contre-pied / Provocateur', this)" class="angle-preset px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-bold text-slate-500 bg-white hover:bg-slate-50 transition-all">Contre-pied</button>
+                                    <button onclick="selectAngle('Pédagogique / Explicatif', this)" class="angle-preset px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-bold text-slate-500 bg-white hover:bg-slate-50 transition-all">Pédagogique</button>
+                                    <button onclick="selectAngle('Fédérateur / Team building', this)" class="angle-preset px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-bold text-slate-500 bg-white hover:bg-slate-50 transition-all">Fédérateur</button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Zone Droite : Posture rédactionnelle -->
+                        <div>
+                            <label class="block text-sm font-bold text-slate-700 mb-3 flex items-center gap-2">
+                                <i class="fa-solid fa-user-shield text-secondary"></i> 2. Quelle est votre posture ?
+                            </label>
+                            <div class="grid grid-cols-2 gap-2" id="posture-container">
+                                <button onclick="selectPosture('opinion', this)" class="posture-btn p-3 rounded-xl border-2 border-primary bg-indigo-50/50 text-primary text-xs font-bold text-left flex items-center gap-2 transition-all">
+                                    <span>💬</span> Opinion personnelle
+                                </button>
+                                <button onclick="selectPosture('analyse', this)" class="posture-btn p-3 rounded-xl border-2 border-slate-100 hover:border-slate-200 text-slate-600 hover:bg-slate-50 text-xs font-bold text-left flex items-center gap-2 transition-all">
+                                    <span>📊</span> Analyse marché
+                                </button>
+                                <button onclick="selectPosture('retour', this)" class="posture-btn p-3 rounded-xl border-2 border-slate-100 hover:border-slate-200 text-slate-600 hover:bg-slate-50 text-xs font-bold text-left flex items-center gap-2 transition-all">
+                                    <span>🎒</span> Retour d'expérience
+                                </button>
+                                <button onclick="selectPosture('conseil', this)" class="posture-btn p-3 rounded-xl border-2 border-slate-100 hover:border-slate-200 text-slate-600 hover:bg-slate-50 text-xs font-bold text-left flex items-center gap-2 transition-all">
+                                    <span>💡</span> Conseil pratique
+                                </button>
+                            </div>
+                        </div>
+
+                    </div>
+
+                    <!-- Ligne du bas : Choix Longueur et Déclenchement -->
+                    <div class="border-t border-slate-100 pt-5 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                        <div>
+                            <label class="block text-sm font-bold text-slate-700 mb-2.5 flex items-center gap-2">
+                                <i class="fa-solid fa-text-width text-amber-500"></i> 3. Longueur du post
+                            </label>
+                            <div class="flex gap-2 w-72" id="length-container">
+                                <button onclick="selectLength('court', this)" class="length-btn flex-1 py-2 rounded-xl border-2 border-slate-100 hover:border-slate-200 text-slate-500 text-xs font-bold transition-all">Court</button>
+                                <button onclick="selectLength('moyen', this)" class="length-btn flex-1 py-2 rounded-xl border-2 border-primary bg-indigo-50 text-primary text-xs font-bold transition-all">Moyen</button>
+                                <button onclick="selectLength('developpe', this)" class="length-btn flex-1 py-2 rounded-xl border-2 border-slate-100 hover:border-slate-200 text-slate-500 text-xs font-bold transition-all">Développé</button>
+                            </div>
+                        </div>
+
+                        <!-- Bouton Générer principal du Labo -->
+                        <div class="w-full md:w-auto self-end">
+                            <button id="btn-generate-bucket" onclick="simulateBucketGeneration()" class="hidden w-full md:w-auto px-8 py-3.5 bg-amber-400 hover:bg-amber-300 text-slate-900 font-extrabold rounded-xl transition-all flex items-center justify-center gap-2 shadow-[0_0_15px_rgba(251,191,36,0.2)] hover:shadow-[0_0_20px_rgba(251,191,36,0.4)]">
+                                <i class="fa-solid fa-wand-magic-sparkles"></i> Mixer & Rédiger mon post
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Résultat Génération Bucket -->
+                <div id="bucket-result" class="hidden mt-6 bg-white p-6 md:p-8 rounded-3xl border border-slate-100 shadow-soft relative overflow-hidden section-anim">
+                    <div class="absolute top-0 left-0 w-1.5 h-full bg-gradient-to-b from-amber-400 to-orange-500"></div>
+                    <div class="flex items-center justify-between mb-5">
+                        <div class="flex items-center gap-3">
+                            <div class="w-10 h-10 rounded-full bg-slate-50 flex items-center justify-center text-slate-600 text-lg border border-slate-100 shadow-sm"><i class="fa-solid fa-robot text-primary"></i></div>
+                            <div>
+                                <p class="text-[15px] font-extrabold text-slate-900" id="bucket-result-title">Le post issu de votre assemblage</p>
+                                <p class="text-xs font-medium text-slate-500" id="bucket-result-subtitle">Posture : Opinion • Longueur : Moyen</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="relative">
+                        <div id="bucket-result-text" contenteditable="true" oninput="updateBucketWordCount()" class="text-[15px] font-medium text-slate-700 leading-relaxed whitespace-pre-line bg-slate-50 p-5 rounded-2xl border border-slate-100 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:bg-white transition-all cursor-text mb-2 post-content-container">La régulation de l'IA (AI Act) votée en Europe fait trembler beaucoup de monde dans la tech. Pourtant, comme le soulevait très justement @MarcSimon récemment, notre focus collectif devrait être ailleurs. 
+
+Arrêtons de chercher des "hacks" de productivité court-termistes. Concentrons-nous sur ce qui compte : utiliser l'IA non pas pour remplacer l'humain, mais pour permettre un vrai passage au travail asynchrone qualitatif. 
+
+C'est là que se trouve la vraie valeur en 2026. L'outil s'adapte à la loi, la culture d'entreprise, elle, reste.
+Vous êtes d'accord avec ce constat ? 👇
+
+#IA #Management #Tech #Europe #FutureOfWork</div>
+                        
+                        <div class="flex justify-between items-center text-xs text-slate-400 font-semibold px-1 mb-5">
+                            <span class="flex items-center gap-1.5"><i class="fa-solid fa-pen text-slate-300"></i> Zone modifiable en direct</span>
+                            <span id="bucket-word-count" class="bg-indigo-50 text-primary px-2 py-1 rounded-md font-bold">103 mots</span>
+                        </div>
+                    </div>
+
+                    <div class="flex justify-end gap-3">
+                        <button onclick="openEditor('bucket-result-text')" class="px-5 py-2.5 text-sm font-bold text-slate-500 bg-white hover:bg-slate-50 border border-slate-200 rounded-xl transition-all shadow-sm"><i class="fa-regular fa-edit"></i> Focus</button>
+                        <button onclick="triggerPublishModal('Assemblage - Le Labo', 'bucket-result-text', selectedPostureLabel, selectedAngle)" class="px-6 py-2.5 text-sm font-bold text-white bg-slate-900 hover:bg-slate-800 rounded-xl transition-all shadow-md transform hover:-translate-y-0.5"><i class="fa-solid fa-paper-plane"></i> Poster</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ========================================== -->
+            <!-- VIEW 4 : ÉVÉNEMENTS                        -->
+            <!-- ========================================== -->
+            <div id="view-events" class="view-section">
+                <div class="mb-8 section-anim flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                    <div>
+                        <h1 class="text-3xl font-extrabold text-slate-900 mb-2 tracking-tight">Vos Temps Forts 🎪</h1>
+                        <p class="text-slate-500 font-medium">Anticipez la communication autour de vos salons, lancements et webinaires.</p>
+                    </div>
+                    <button onclick="showToast('Ouverture du formulaire d\'ajout...')" class="bg-slate-900 text-white px-5 py-2.5 rounded-xl text-sm font-bold hover:bg-slate-800 transition-colors shadow-md flex items-center gap-2">
+                        <i class="fa-solid fa-plus"></i> Nouvel événement
+                    </button>
+                </div>
+
+                <div class="space-y-4">
+                    <!-- Event 1 : À venir -->
+                    <div class="section-anim bg-white rounded-2xl border border-slate-100 shadow-soft p-5 flex flex-col md:flex-row items-start md:items-center gap-6 hover:shadow-md transition-shadow relative overflow-hidden">
+                        <div class="absolute left-0 top-0 w-1.5 h-full bg-amber-400"></div>
+                        <div class="bg-amber-50 text-amber-600 w-20 h-20 rounded-xl flex flex-col items-center justify-center shrink-0 border border-amber-100">
+                            <span class="text-xs font-bold uppercase tracking-wider">Juin</span>
+                            <span class="text-2xl font-extrabold">18</span>
+                        </div>
+                        <div class="flex-1">
+                            <div class="flex items-center gap-2 mb-1.5">
+                                <span class="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-amber-100 text-amber-700 uppercase tracking-wider">À venir</span>
+                                <span class="text-xs text-slate-500 font-bold flex items-center gap-1.5"><i class="fa-solid fa-video text-slate-400"></i> Webinaire Live</span>
+                            </div>
+                            <h3 class="text-lg font-extrabold text-slate-800" id="event-title-1">Le futur de l'asynchrone en SaaS B2B</h3>
+                            <p class="text-sm text-slate-500 mt-1 font-medium">Vous intervenez avec 2 autres experts. L'IA recommande 3 posts pour maximiser l'audience.</p>
+                            <!-- Hidden text container for simulation -->
+                            <div class="hidden" id="event-text-1">Rendez-vous le 18 Juin prochain pour notre live exclusif sur le futur du SaaS B2B asynchrone ! Nous ferons sauter tous les mythes de l'organisation rigide. #Webinaire #SaaS #SaaSMetrics</div>
+                        </div>
+                        <div class="flex flex-col gap-2 w-full md:w-auto mt-4 md:mt-0">
+                            <button onclick="triggerPublishModal('Webinaire Live - Teasing', 'event-text-1', 'Annonce / Teasing', 'Futur de l\'asynchrone')" class="w-full md:w-auto px-5 py-2.5 bg-slate-900 text-white text-sm font-bold rounded-xl hover:bg-slate-800 transition-colors shadow-sm flex items-center justify-center gap-2">
+                                <i class="fa-solid fa-paper-plane"></i> Poster
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Event 2 : Passé (Debrief à faire) -->
+                    <div class="section-anim bg-white rounded-2xl border border-slate-100 shadow-soft p-5 flex flex-col md:flex-row items-start md:items-center gap-6 hover:shadow-md transition-shadow relative overflow-hidden">
+                        <div class="absolute left-0 top-0 w-1.5 h-full bg-primary"></div>
+                        <div class="bg-indigo-50 text-primary w-20 h-20 rounded-xl flex flex-col items-center justify-center shrink-0 border border-indigo-100">
+                            <span class="text-xs font-bold uppercase tracking-wider">Mai</span>
+                            <span class="text-2xl font-extrabold">22</span>
+                        </div>
+                        <div class="flex-1">
+                            <div class="flex items-center gap-2 mb-1.5">
+                                <span class="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-indigo-100 text-primary uppercase tracking-wider">Terminé</span>
+                                <span class="text-xs text-slate-500 font-bold flex items-center gap-1.5"><i class="fa-solid fa-users text-slate-400"></i> Salon Physique</span>
+                            </div>
+                            <h3 class="text-lg font-extrabold text-slate-800" id="event-title-2">Vivatech 2026 - Paris</h3>
+                            <p class="text-sm text-slate-500 mt-1 font-medium">L'événement est terminé. Profitez-en pour partager vos impressions à chaud.</p>
+                            <!-- Hidden text container for simulation -->
+                            <div class="hidden" id="event-text-2">Vivatech 2026 c'est fini ! Une édition intense riche en échanges et en technologies disruptives. Mon principal constat ? L'IA se démocratise enfin et passe du gadget à l'industrie utile. #Vivatech #Paris #Innovation</div>
+                        </div>
+                        <div class="flex flex-col gap-2 w-full md:w-auto mt-4 md:mt-0">
+                            <button onclick="triggerPublishModal('Vivatech 2026 - Debrief', 'event-text-2', 'Retour d\'expérience', 'Impressions salon Vivatech')" class="w-full md:w-auto px-5 py-2.5 bg-white border border-slate-200 text-slate-700 text-sm font-bold rounded-xl hover:bg-slate-50 hover:border-primary/50 transition-colors shadow-sm flex items-center justify-center gap-2">
+                                <i class="fa-solid fa-paper-plane text-primary"></i> Poster "Debrief"
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ========================================== -->
+            <!-- VIEW 5 : SUIVI & STRATÉGIE                 -->
+            <!-- ========================================== -->
+            <div id="view-analytics" class="view-section">
+                <div class="mb-8 section-anim">
+                    <h1 class="text-3xl font-extrabold text-slate-900 mb-2 tracking-tight">Suivi & Stratégie 📊</h1>
+                    <p class="text-slate-500 font-medium">Visualisez l'historique complet de vos publications pour analyser la structure de vos prises de parole.</p>
+                </div>
+
+                <!-- Table of Published Posts -->
+                <div class="bg-white rounded-3xl border border-slate-100 shadow-soft p-6 section-anim">
+                    <h3 class="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
+                        <i class="fa-solid fa-list-ul text-primary"></i> Historique de vos publications
+                    </h3>
+                    <div class="overflow-x-auto">
+                        <table class="w-full min-w-[600px]">
+                            <thead>
+                                <tr class="border-b border-slate-100 text-left text-xs font-bold text-slate-400 uppercase tracking-wider">
+                                    <th class="py-3 px-4">Titre / Contenu</th>
+                                    <th class="py-3 px-4">Posture</th>
+                                    <th class="py-3 px-4">Angle / Sujet</th>
+                                    <th class="py-3 px-4">Date</th>
+                                    <th class="py-3 px-4 text-right">Statut</th>
+                                </tr>
+                            </thead>
+                            <tbody id="history-table-body" class="divide-y divide-slate-100 text-sm font-medium text-slate-700">
+                                <!-- Dynamic insertions here -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ========================================== -->
+            <!-- VIEW 6 : COMPTE / CONFIGURATION            -->
+            <!-- ========================================== -->
+            <div id="view-account" class="view-section">
+                <div class="mb-8 section-anim">
+                    <button onclick="switchTab('weekly')" class="text-sm font-bold text-slate-400 hover:text-primary mb-5 flex items-center gap-2 transition-colors bg-white px-4 py-2 rounded-lg border border-slate-200 shadow-sm inline-flex">
+                        <i class="fa-solid fa-arrow-left"></i> Retour au tableau de bord
+                    </button>
+                    <h1 class="text-3xl font-extrabold text-slate-900 mb-2 tracking-tight">Configuration du Compte ⚙️</h1>
+                    <p class="text-slate-500 font-medium">Réglez le moteur de l'IA et suivez votre objectif de publication.</p>
+                </div>
+
+                <div class="space-y-6">
+                    
+                    <!-- Profil & LinkedIn -->
+                    <div class="section-anim bg-white p-6 md:p-8 rounded-3xl border border-slate-100 shadow-soft flex flex-col md:flex-row gap-6 items-center justify-between relative overflow-hidden">
+                        <div class="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-[#0A66C2]/10 to-transparent rounded-bl-full -z-10"></div>
+                        <div class="flex items-center gap-5">
+                            <div class="w-16 h-16 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 text-2xl border-4 border-white shadow-md">
+                                <i class="fa-solid fa-user"></i>
+                            </div>
+                            <div>
+                                <h2 class="text-xl font-extrabold text-slate-800">Votre Profil</h2>
+                                <p class="text-sm font-bold text-slate-500">Directeur</p>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-4 bg-slate-50 px-5 py-4 rounded-2xl border border-slate-100 shadow-inner shadow-slate-100">
+                            <i class="fa-brands fa-linkedin text-4xl text-[#0A66C2]"></i>
+                            <div>
+                                <p class="text-[15px] text-emerald-600 font-extrabold flex items-center gap-2"><i class="fa-solid fa-circle-check"></i> Compte connecté</p>
+                                <button onclick="showToast('Déconnexion simulée.')" class="text-xs font-bold text-slate-400 hover:text-rose-500 transition-colors mt-1">Révoquer l'accès</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Strategie Tracker Card & Rythme (UNIFIÉE) -->
+                    <div class="bg-white rounded-3xl border border-slate-100 shadow-soft p-6 section-anim relative overflow-hidden">
+                        <div class="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-primary to-secondary"></div>
+                        <div class="flex flex-col md:flex-row md:items-center justify-between gap-6">
+                            <div class="flex items-center gap-4">
+                                <div class="w-12 h-12 rounded-xl bg-indigo-50 text-primary flex items-center justify-center text-xl shadow-inner shrink-0"><i class="fa-solid fa-sliders"></i></div>
+                                <div>
+                                    <span class="text-xs font-bold text-primary uppercase tracking-widest bg-indigo-50 px-2.5 py-1 rounded-full">Régularité Hebdomadaire</span>
+                                    <h2 class="text-xl font-extrabold text-slate-800 mt-1.5" id="analytics-strategy-title">Objectif de la semaine : 2 posts</h2>
+                                </div>
+                            </div>
+                            <div class="text-center md:text-right">
+                                <span class="text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-primary to-secondary" id="weekly-progress-percent">50%</span>
+                                <p class="text-xs font-bold text-slate-400 uppercase mt-1">Complété cette semaine</p>
+                            </div>
+                        </div>
+                        
+                        <!-- Progress Bar -->
+                        <div class="w-full bg-slate-100 h-3.5 rounded-full mt-6 overflow-hidden">
+                            <div id="strategy-progress-bar" class="bg-gradient-to-r from-primary to-secondary h-full rounded-full transition-all duration-700" style="width: 50%;"></div>
+                        </div>
+                        <div class="flex justify-between items-center text-xs font-semibold text-slate-400 mt-3 pb-5 border-b border-slate-100">
+                            <span id="strategy-progress-label">1 post publié</span>
+                            <span id="strategy-progress-target">Objectif : 2 posts</span>
+                        </div>
+
+                        <!-- Configurator selector inside same card -->
+                        <div class="mt-5 flex flex-col gap-4">
+                            <label class="text-sm font-bold text-slate-700">Combien de posts LinkedIn visez-vous par semaine ?</label>
+                            <div class="flex gap-3 w-full max-w-sm" id="strategy-count-selector">
+                                <button onclick="setStrategyFrequency(1, this)" class="strat-btn flex-1 py-3 rounded-xl border-2 border-slate-100 text-slate-500 text-sm font-bold hover:bg-slate-50 transition-all">1 Post</button>
+                                <button onclick="setStrategyFrequency(2, this)" class="strat-btn flex-1 py-3 rounded-xl border-2 border-primary bg-indigo-50 text-primary text-sm font-bold hover:bg-slate-50 transition-all">2 Posts</button>
+                                <button onclick="setStrategyFrequency(3, this)" class="strat-btn flex-1 py-3 rounded-xl border-2 border-slate-100 text-slate-500 text-sm font-bold hover:bg-slate-50 transition-all">3 Posts</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Lignes de configuration -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <!-- Keywords -->
+                        <div class="section-anim bg-white p-6 md:p-8 rounded-3xl border border-slate-100 shadow-soft">
+                            <div class="flex items-center gap-4 mb-5">
+                                <div class="w-12 h-12 rounded-xl bg-indigo-50 text-primary flex items-center justify-center text-xl"><i class="fa-solid fa-tags"></i></div>
+                                <h2 class="text-xl font-extrabold text-slate-800">Secteur & Veille</h2>
+                            </div>
+                            <p class="text-sm font-medium text-slate-500 mb-6">L'IA lit l'actualité de ces sujets pour vous.</p>
+                            <div class="flex flex-wrap gap-2.5 mb-6">
+                                <span class="px-3.5 py-2 bg-slate-50 border border-slate-200 text-slate-700 rounded-xl text-sm flex items-center gap-2 font-bold shadow-sm">Intelligence Artificielle <button class="text-slate-400 hover:text-rose-500 transition-colors"><i class="fa-solid fa-times"></i></button></span>
+                                <span class="px-3.5 py-2 bg-slate-50 border border-slate-200 text-slate-700 rounded-xl text-sm flex items-center gap-2 font-bold shadow-sm">SaaS B2B <button class="text-slate-400 hover:text-rose-500 transition-colors"><i class="fa-solid fa-times"></i></button></span>
+                            </div>
+                            <div class="flex gap-2">
+                                <input type="text" placeholder="Ajouter un mot-clé..." class="flex-1 px-4 py-3 border border-slate-200 rounded-xl text-sm font-medium outline-none focus:ring-4 focus:ring-primary/10 focus:border-primary bg-slate-50 transition-all">
+                                <button class="bg-slate-900 text-white px-5 py-3 rounded-xl text-sm font-bold hover:bg-slate-800 transition-colors shadow-md">Ajouter</button>
+                            </div>
+                        </div>
+
+                        <!-- Influencers -->
+                        <div class="section-anim bg-white p-6 md:p-8 rounded-3xl border border-slate-100 shadow-soft">
+                            <div class="flex items-center gap-4 mb-5">
+                                <div class="w-12 h-12 rounded-xl bg-purple-50 text-secondary flex items-center justify-center text-xl"><i class="fa-solid fa-users-viewfinder"></i></div>
+                                <h2 class="text-xl font-extrabold text-slate-800">Réseau & Inspis</h2>
+                            </div>
+                            <p class="text-sm font-medium text-slate-500 mb-6">L'IA s'inspire de leurs posts pour créer des rebonds.</p>
+                            <ul class="space-y-3 mb-6">
+                                <li class="flex items-center justify-between text-sm bg-slate-50 px-4 py-3 rounded-xl border border-slate-200 shadow-sm">
+                                    <span class="text-slate-700 font-bold">@MarcSimon (Expert RH)</span>
+                                    <button class="text-slate-400 hover:text-rose-500 transition-colors"><i class="fa-solid fa-trash"></i></button>
+                                </li>
+                            </ul>
+                            <div class="flex gap-2">
+                                <input type="text" placeholder="URL Profil LinkedIn..." class="flex-1 px-4 py-3 border border-slate-200 rounded-xl text-sm font-medium outline-none focus:ring-4 focus:ring-primary/10 focus:border-primary bg-slate-50 transition-all">
+                                <button class="bg-slate-900 text-white px-5 py-3 rounded-xl text-sm font-bold hover:bg-slate-800 transition-colors shadow-md">Ajouter</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Ligne Style d'écriture -->
+                    <div class="section-anim bg-white p-6 md:p-8 rounded-3xl border border-slate-100 shadow-soft mt-6">
+                        <div class="flex items-center gap-4 mb-5">
+                            <div class="w-12 h-12 rounded-xl bg-amber-50 text-amber-500 flex items-center justify-center text-xl shadow-inner"><i class="fa-solid fa-pen-nib"></i></div>
+                            <div>
+                                <h2 class="text-xl font-extrabold text-slate-800">Votre Style (Instructions IA)</h2>
+                                <p class="text-sm font-medium text-slate-500">Aidez l'IA à imiter parfaitement votre plume.</p>
+                            </div>
+                        </div>
+                        <div class="flex flex-col gap-4">
+                            <label class="text-sm font-bold text-slate-700">Collez un de vos meilleurs posts, ou décrivez vos tics de langage :</label>
+                            <textarea rows="4" placeholder="Ex: Je fais toujours des phrases très courtes. Je commence souvent par une affirmation forte. Je tutoie mon audience. Je n'utilise jamais de jargon compliqué..." class="w-full px-5 py-4 rounded-xl border border-slate-200 focus:ring-4 focus:ring-primary/10 focus:border-primary outline-none transition-all text-[15px] resize-none bg-slate-50 focus:bg-white font-medium shadow-inner shadow-slate-100/50">Je fais toujours des phrases directes et courtes. Je commence par une accroche percutante. Je conclus avec un call to action pour inciter les autres décideurs à partager leur retour d'expérience.</textarea>
+                            <div class="flex justify-end">
+                                <button onclick="showToast('Vos instructions de style ont été enregistrées !')" class="bg-slate-900 text-white px-6 py-3 rounded-xl text-sm font-bold hover:bg-slate-800 transition-colors shadow-md flex items-center gap-2">
+                                    <i class="fa-solid fa-floppy-disk"></i> Enregistrer le style
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+
+        </div>
+    </main>
+
+    <!-- ========================================== -->
+    <!-- PUBLICATION MODAL (Narro Assist)           -->
+    <!-- ========================================== -->
+    <div id="publish-modal" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm hidden opacity-0">
+        <div id="publish-modal-card" class="bg-white rounded-3xl w-full max-w-lg p-6 md:p-8 border border-slate-100 shadow-2xl relative mx-4 scale-95 transition-transform duration-300">
+            <!-- Close button -->
+            <button onclick="closePublishModal()" class="absolute top-4 right-4 w-10 h-10 rounded-full hover:bg-slate-50 flex items-center justify-center text-slate-400 hover:text-slate-700 transition-colors">
+                <i class="fa-solid fa-times text-lg"></i>
+            </button>
+            
+            <h2 class="text-2xl font-extrabold text-slate-900 mb-6 flex items-center gap-3">
+                <span class="w-10 h-10 rounded-xl bg-gradient-to-br from-[#0A66C2] to-primary flex items-center justify-center text-white text-base shadow-md">
+                    <i class="fa-brands fa-linkedin-in"></i>
+                </span>
+                Prêt à publier !
+            </h2>
+
+            <div class="space-y-6">
+                <!-- Step 1: Text Copy Area -->
+                <div class="bg-slate-50 p-4 rounded-2xl border border-slate-200 relative">
+                    <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Votre texte LinkedIn</p>
+                    <div id="modal-post-preview" class="text-sm font-medium text-slate-700 leading-relaxed max-h-40 overflow-y-auto whitespace-pre-line pr-2">
+                        <!-- Loaded dynamically -->
+                    </div>
+                    <button onclick="copyModalPostText()" class="mt-4 w-full bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 py-3 rounded-xl font-bold transition-all flex items-center justify-center gap-2 text-sm shadow-sm active:scale-95">
+                        <i class="fa-regular fa-copy text-primary"></i> Copier le texte
+                    </button>
+                </div>
+
+                <!-- Step 2: Open LinkedIn Action -->
+                <div class="flex items-start gap-4">
+                    <div class="w-8 h-8 rounded-full bg-indigo-50 text-primary flex items-center justify-center font-bold text-sm shrink-0 mt-1">1</div>
+                    <div>
+                        <h4 class="font-bold text-slate-800 text-sm">Ouvrez LinkedIn pour coller</h4>
+                        <p class="text-xs text-slate-500 mt-1">Cliquez sur le bouton pour être redirigé vers l'espace de publication sur votre profil.</p>
+                        <a href="https://www.linkedin.com/feed/" target="_blank" onclick="showToast('Onglet LinkedIn ouvert. Collez le post !')" class="mt-2 inline-flex items-center gap-2 bg-[#0A66C2] hover:bg-[#084e93] text-white text-xs font-bold px-4 py-2.5 rounded-lg transition-all shadow-sm">
+                            <i class="fa-solid fa-external-link"></i> Aller sur LinkedIn
+                        </a>
+                    </div>
+                </div>
+
+                <!-- Step 3: Confirmation -->
+                <div class="flex items-start gap-4 border-t border-slate-100 pt-5">
+                    <div class="w-8 h-8 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold text-sm shrink-0 mt-1">2</div>
+                    <div class="flex-1">
+                        <h4 class="font-bold text-slate-800 text-sm">Validation & Suivi</h4>
+                        <p class="text-xs text-slate-500 mt-1">Une fois publié sur LinkedIn, validez ici pour l'ajouter à votre tableau de régularité.</p>
+                    </div>
+                </div>
+
+                <div class="flex gap-3 mt-4">
+                    <button onclick="closePublishModal()" class="flex-1 py-3 bg-slate-50 hover:bg-slate-100 text-slate-600 rounded-xl font-bold transition-all text-sm">
+                        Fermer
+                    </button>
+                    <button onclick="confirmPublication()" class="flex-[2] py-3 bg-slate-900 hover:bg-slate-800 text-white rounded-xl font-bold transition-all text-sm shadow-md flex items-center justify-center gap-2">
+                        <i class="fa-solid fa-circle-check text-emerald-400"></i> Oui, c'est publié !
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Global App State
+        let appState = {
+            targetWeeklyPosts: 2,
+            publishedPosts: [
+                { id: 1, date: '08 Juin 2026', title: "Régulation de l'IA Act en Europe", posture: "Analyse marché", angle: "Opportunité de confiance", status: "Publié" },
+                { id: 2, date: '04 Juin 2026', title: "Le paradoxe du salaire et de la flexibilité", posture: "Opinion personnelle", angle: "Flexibilité asynchrone", status: "Publié" }
+            ],
+            currentPublishingPost: null
+        };
+
+        let currentWeekOffset = 0; // 0 = Cette semaine, -1 = Semaine dernière, -2 = Il y a 2 semaines
+        let currentLabWeekOffset = 0; // Sélecteur séparé pour les sources dans Le Labo
+        let editModeActive = false; // Mode édition globale des maquettes/verbatims
+        
+        let weeklyData = {
+            0: [
+                {
+                    id: "weekly-1",
+                    type: "actu",
+                    category: "Basé sur l'actualité",
+                    dateLabel: "Mardi 10h00",
+                    text: `L'annonce récente de la Commission Européenne sur la régulation de l'IA rebat les cartes pour notre secteur. 🇪🇺\n\nBeaucoup y voient un frein. Chez nous, j'y vois au contraire une opportunité de l'utiliser comme standard de confiance et d'éthique.\n\nL'innovation sans cadre n'est que chaos. C'est le moment pour les acteurs européens de montrer l'exemple.\n\n#IA #Tech #Europe #Régulation`,
+                    visualType: "image",
+                    published: false,
+                    title: "Régulation de l'IA - Actualité",
+                    posture: "Analyse marché",
+                    angle: "Opportunité de confiance"
+                },
+                {
+                    id: "weekly-2",
+                    type: "reseau",
+                    category: "Rebond sur votre réseau",
+                    dateLabel: "Suggestion chaude",
+                    text: `Je lisais ce matin un excellent post sur les difficultés de recrutement des profils tech seniors en 2026. Le constat est juste.\n\nLe salaire ne suffit plus. Ce que nous remarquons chez nous, c'est que la flexibilité asynchrone est devenue le critère n°1, loin devant les avantages matériels.\n\nEt vous, dirigeants, quel est votre principal levier d'attractivité aujourd'hui ? 👇\n\n#Recrutement #Management #FutureOfWork`,
+                    visualType: "carousel",
+                    published: false,
+                    title: "Le paradoxe du recrutement Tech senior",
+                    posture: "Opinion personnelle",
+                    angle: "Focus flexibilité asynchrone"
+                }
+            ],
+            "-1": [
+                {
+                    id: "weekly-old-1",
+                    type: "actu",
+                    category: "Basé sur l'actualité",
+                    dateLabel: "Publié le 02 Juin",
+                    text: `La baisse globale des levées de fonds dans la tech au Q1 2026 n'est pas une crise, c'est un retour sain à la réalité économique. 📉\n\nFinie la course aux valorisations folles basées sur de simples fichiers Excel. Place aux critères fondamentaux : rentabilité, intégration produit et vrai "churn" maîtrisé.\n\nC'est la meilleure période pour construire de la valeur robuste.\n\n#Economie #Tech #SaaS #Raison`,
+                    visualType: "chart",
+                    published: true, 
+                    title: "L'économie réelle rattrape la Tech",
+                    posture: "Analyse marché",
+                    angle: "Retour à la raison économique"
+                },
+                {
+                    id: "weekly-old-2",
+                    type: "reseau",
+                    category: "Rebond sur votre réseau",
+                    dateLabel: "Manqué le 04 Juin",
+                    text: `Pourquoi tant de fondateurs SaaS refusent encore de recruter des managers intermédiaires ?\n\nOn appelle ça le "syndrome du micro-management". C'est le moyen le plus rapide de fatiguer vos profils A-player et de bloquer votre croissance.\n\nLa confiance n'exclut pas le contrôle, mais le contrôle permanent détruit l'autonomie.\n\n#Management #RH #SaaS #Confiance`,
+                    visualType: "quote",
+                    published: false, 
+                    isExpired: true,
+                    title: "Le piège du micro-management",
+                    posture: "Conseil pratique",
+                    angle: "Micro-management vs Délégation"
+                }
+            ],
+            "-2": [
+                {
+                    id: "weekly-old-3",
+                    type: "actu",
+                    category: "Visite Salon",
+                    dateLabel: "Publié le 25 Mai",
+                    text: `De retour du salon Vivatech à Paris ! Une effervescence technologique indéniable, mais ma principale impression reste mitigée.\n\nOn frôle parfois l'excès de "gadgets IA" sans réel intérêt industriel. La différence entre un outil sympa et une solution business est pourtant abyssale.\n\nRecentrons l'IA sur la création de temps libre utile.\n\n#Vivatech #Paris #Tech #Utilité`,
+                    visualType: "image",
+                    published: true, 
+                    title: "Vivatech : Du gadget à la vraie utilité",
+                    posture: "Retour d'expérience",
+                    angle: "Analyse à chaud post-salon"
+                },
+                {
+                    id: "weekly-old-4",
+                    type: "reseau",
+                    category: "Rebond réseau",
+                    dateLabel: "Publié le 28 Mai",
+                    text: `En B2B, l'erreur classique est de passer 90% du pitch à expliquer COMMENT fonctionne votre produit.\n\nVos clients s'en moquent. Ce qu'ils veulent savoir, c'est ce qu'ils vont GAGNER à vous utiliser : du temps libéré, des risques évités ou des coûts optimisés.\n\nVendez le résultat, pas la mécanique.\n\n#Sales #B2B #SaaS #Mindset`,
+                    visualType: "quote",
+                    published: true, 
+                    title: "Vendez des résultats, pas des fonctionnalités",
+                    posture: "Conseil pratique",
+                    angle: "Focus valeur ajoutée"
+                }
+            ]
+        };
+
+        // Base de données des sources temporelles du Labo de Drag & Drop
+        let labSourcesData = {
+            0: {
+                news: [
+                    { id: "news-1", category: "Tech", title: "L'Europe vote la nouvelle loi sur la régulation de l'IA (AI Act).", origin: "TechCrunch", logo: "⚡", url: "https://techcrunch.com" },
+                    { id: "news-2", category: "Économie", title: "Baisse des levées de fonds dans la tech de 30% au Q1 2026.", origin: "Les Echos", logo: "📈", url: "https://lesechos.fr" },
+                    { id: "news-3", category: "SaaS B2B", title: "L'intégration native, nouvel eldorado pour contrer le \"churn\".", origin: "SaaS Club", logo: "🔌", url: "https://saasclub.com" },
+                    { id: "news-4", category: "IA Globale", title: "Les modèles locaux légers prennent le pas sur les gros serveurs cloud.", origin: "Silicon.fr", logo: "🧠", url: "https://silicon.fr" }
+                ],
+                influences: [
+                    { id: "influence-1", user: "@MarcSimon", tag: "Expert RH", text: "Le management hybride est mort, place à l'asynchrone total pour 2027.", logo: "MS", url: "https://linkedin.com" },
+                    { id: "influence-2", user: "@JulieDupont", tag: "SaaS Strategy", text: "Arrêtez de vendre des features. En B2B, on vend du temps libre.", logo: "JD", url: "https://linkedin.com" },
+                    { id: "influence-3", user: "@PierreG", tag: "SaaS Founder", text: "Le service client n'est pas un centre de coût, c'est votre principale source de R&D.", logo: "PG", url: "https://linkedin.com" }
+                ]
+            },
+            "-1": {
+                news: [
+                    { id: "news-old-1", category: "Régulation", title: "Le RGPD 2.0 en cours de discussion pour intégrer les agents d'IA autonomes.", origin: "L'Usine Digitale", logo: "🛡️", url: "https://usinedigitale.fr" },
+                    { id: "news-old-2", category: "Productivité", title: "La semaine de 4 jours séduit de plus en plus de grands groupes d'ingénierie.", origin: "Le Monde", logo: "⏰", url: "https://lemonde.fr" },
+                    { id: "news-old-3", category: "Semiconducteurs", title: "NVIDIA annonce sa nouvelle puce ultra-efficace pour les serveurs locaux.", origin: "Wired", logo: "💾", url: "https://wired.com" }
+                ],
+                influences: [
+                    { id: "influence-old-1", user: "@AntoineHR", tag: "Talent Acquisition", text: "Si vos recruteurs passent encore 3h par jour à trier des CV, vous avez déjà perdu.", logo: "AH", url: "https://linkedin.com" },
+                    { id: "influence-old-2", user: "@ClarisseData", tag: "CDO Specialist", text: "Pas de bonne IA sans bonnes données. Nettoyez vos bases CRM avant de rêver de prédictions.", logo: "CD", url: "https://linkedin.com" }
+                ]
+            },
+            "-2": {
+                news: [
+                    { id: "news-old-4", category: "Startup", title: "Vivatech annonce un record d'affluence pour son édition 2026 à Paris.", origin: "La Tribune", logo: "🗼", url: "https://latribune.fr" },
+                    { id: "news-old-5", category: "Management", title: "Pourquoi le 'quiet quitting' est remplacé par le 'quiet hiring' cette année.", origin: "HBR France", logo: "💼", url: "https://hbrfrance.fr" }
+                ],
+                influences: [
+                    { id: "influence-old-3", user: "@SarahInnov", tag: "Product Lead", text: "La meilleure fonctionnalité produit est celle que vous supprimez parce qu'elle complexifie l'usage.", logo: "SI", url: "https://linkedin.com" }
+                ]
+            }
+        };
+
+        // State variables for the Assembler/Labo
+        let selectedAngle = "Aucun angle spécifique défini";
+        let selectedPosture = "opinion";
+        let selectedPostureLabel = "Opinion personnelle";
+        let selectedLength = "moyen";
+
+        // Word Count Calculator Utility
+        function countWords(str) {
+            return str.trim().split(/\s+/).filter(w => w.length > 0).length;
+        }
+
+        // Live text change and word count update for Weekly cards
+        function handleWeeklyTextChange(postId) {
+            const textEl = document.getElementById(`text-${postId}`);
+            const countEl = document.getElementById(`word-count-${postId}`);
+            if (textEl && countEl) {
+                const text = textEl.innerText;
+                const count = countWords(text);
+                countEl.innerText = `${count} mots`;
+                
+                // Save changes to current state database instantly
+                const postObj = weeklyData[currentWeekOffset].find(p => p.id === postId);
+                if (postObj) postObj.text = text;
+            }
+        }
+
+        // Live word count handler for Easy Post generator result
+        function updateEasyPostWordCount() {
+            const el = document.getElementById('easypost-rendered-text');
+            const badge = document.getElementById('easypost-word-count');
+            if (el && badge) {
+                const count = countWords(el.innerText);
+                badge.innerText = `${count} mots`;
+            }
+        }
+
+        // Live word count handler for Le Labo mixer result
+        function updateBucketWordCount() {
+            const el = document.getElementById('bucket-result-text');
+            const badge = document.getElementById('bucket-word-count');
+            if (el && badge) {
+                const count = countWords(el.innerText);
+                badge.innerText = `${count} mots`;
+            }
+        }
+
+        /* --- MOCKUP EDIT MODE IMPLEMENTATION --- */
+        function toggleEditMode() {
+            editModeActive = !editModeActive;
+            const btn = document.getElementById('btn-toggle-edit-mode');
+            
+            if (editModeActive) {
+                btn.innerHTML = '<i class="fa-solid fa-lock-open text-amber-400"></i> Mode Édition : ACTIF';
+                btn.className = "px-4 py-2.5 rounded-xl text-xs font-extrabold bg-indigo-600 text-white hover:bg-indigo-700 transition-all flex items-center gap-2 shadow-glow whitespace-nowrap";
+                showToast("Mode édition activé ! Vous pouvez modifier TOUS les textes et boutons de l'interface.");
+                applyEditModeStyles();
+            } else {
+                btn.innerHTML = '<i class="fa-solid fa-pen-to-square text-indigo-400"></i> Éditer les verbatims (Maquette)';
+                btn.className = "px-4 py-2.5 rounded-xl text-xs font-extrabold bg-slate-800 text-white hover:bg-slate-700 transition-all flex items-center gap-2 shadow-sm whitespace-nowrap";
+                showToast("Mode édition désactivé. Les boutons fonctionnent à nouveau.");
+                removeEditModeStyles();
+            }
+        }
+
+        function applyEditModeStyles() {
+            // Target key text elements, buttons, titles and list items
+            const elements = document.querySelectorAll('h1, h2, h3, p, span, button, a.nav-item, label, th, td');
+            elements.forEach(el => {
+                if (el.closest('#toast-container') || el.closest('#mockup-tools-panel')) return;
+                
+                el.setAttribute('contenteditable', 'true');
+                el.classList.add('editable-maquette-active');
+                
+                // Prevent buttons and tabs from doing default navigation actions while in edit mode
+                el.addEventListener('click', preventDefaultAction, true);
+            });
+        }
+
+        function removeEditModeStyles() {
+            const elements = document.querySelectorAll('[contenteditable="true"]');
+            elements.forEach(el => {
+                // Keep original editable post containers editable
+                if (el.classList.contains('post-content-container') || el.id === 'bucket-result-text') return;
+                
+                el.removeAttribute('contenteditable');
+                el.classList.remove('editable-maquette-active');
+                el.removeEventListener('click', preventDefaultAction, true);
+            });
+        }
+
+        function preventDefaultAction(e) {
+            if (editModeActive) {
+                e.preventDefault();
+                e.stopPropagation();
+            }
+        }
+
+        // Export customized HTML file as download blob
+        function exportEditedHTML() {
+            const wasActive = editModeActive;
+            // Deactivate edit mode styles for clean HTML output
+            if (wasActive) {
+                toggleEditMode();
+            }
+            
+            // Remove panel and toasts before export to ensure they don't load pre-rendered in saved code
+            const panel = document.getElementById('mockup-tools-panel');
+            panel.remove();
+            
+            const htmlContent = "<!DOCTYPE html>\n" + document.documentElement.outerHTML;
+            
+            const blob = new Blob([htmlContent], { type: 'text/html' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'Narro_Maquette_Personalisee.html';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            
+            showToast("Maquette HTML personnalisée téléchargée !");
+            
+            // Reload the tab to restore tools panel visually
+            setTimeout(() => {
+                window.location.reload();
+            }, 1000);
+        }
+
+        // Dynamic visual changer logic
+        function changeVisualType(postId, type) {
+            const postObj = weeklyData[currentWeekOffset].find(p => p.id === postId);
+            if (postObj) postObj.visualType = type;
+
+            const container = document.getElementById(`visual-container-${postId}`);
+            
+            if (type === 'none') {
+                gsap.to(container, {
+                    height: 0, 
+                    opacity: 0, 
+                    duration: 0.35, 
+                    ease: "power2.out", 
+                    onComplete: () => {
+                        container.classList.add('hidden');
+                        const select = document.getElementById(`visual-type-${postId}`);
+                        if(select) select.value = 'none';
+                    }
+                });
+                showToast("Visuel retiré du post");
+                return;
+            }
+
+            container.classList.remove('hidden');
+            gsap.to(container, {height: 'auto', opacity: 1, duration: 0.35});
+
+            const formats = ['image', 'carousel', 'chart', 'quote'];
+
+            formats.forEach(f => {
+                const el = document.getElementById(`visual-${postId}-${f}`);
+                if (el) {
+                    el.classList.add('hidden');
+                    el.classList.remove('flex');
+                }
+            });
+
+            const targetEl = document.getElementById(`visual-${postId}-${type}`);
+            if (targetEl) {
+                targetEl.classList.remove('hidden');
+                if (type !== 'image') {
+                    targetEl.classList.add('flex');
+                }
+                
+                gsap.fromTo(targetEl, 
+                    { opacity: 0, scale: 0.96, y: 5 },
+                    { opacity: 1, scale: 1, y: 0, duration: 0.45, ease: "back.out(1.2)" }
+                );
+            }
+
+            const iconEl = document.getElementById(`visual-icon-${postId}`);
+            if (iconEl) {
+                if (type === 'image') iconEl.innerHTML = '<i class="fa-solid fa-image text-primary"></i>';
+                if (type === 'carousel') iconEl.innerHTML = '<i class="fa-solid fa-layer-group text-secondary"></i>';
+                if (type === 'chart') iconEl.innerHTML = '<i class="fa-solid fa-chart-simple text-amber-500"></i>';
+                if (type === 'quote') iconEl.innerHTML = '<i class="fa-solid fa-quote-left text-rose-500"></i>';
+            }
+
+            showToast(`Format mis à jour : ${type === 'carousel' ? 'Carrousel' : type === 'chart' ? 'Graphique' : type === 'quote' ? 'Citation' : 'Image'}`);
+        }
+
+        // Navigate between weeks on the Main Suggestions list
+        function navigateWeek(direction) {
+            const newOffset = currentWeekOffset + direction;
+            if (newOffset < -2 || newOffset > 0) return;
+            
+            currentWeekOffset = newOffset;
+            
+            const btnNext = document.getElementById('btn-next-week');
+            if (currentWeekOffset === 0) {
+                btnNext.classList.add('opacity-40', 'cursor-not-allowed');
+                btnNext.disabled = true;
+            } else {
+                btnNext.classList.remove('opacity-40', 'cursor-not-allowed');
+                btnNext.disabled = false;
+            }
+            
+            const weekTitles = {
+                0: "Cette semaine",
+                "-1": "La semaine dernière",
+                "-2": "Il y a 2 semaines"
+            };
+            const weekRanges = {
+                0: "08 Juin - 14 Juin 2026",
+                "-1": "01 Juin - 07 Juin 2026",
+                "-2": "25 Mai - 31 Mai 2026"
+            };
+            
+            document.getElementById('week-display-title').innerText = weekTitles[currentWeekOffset];
+            document.getElementById('week-display-range').innerText = weekRanges[currentWeekOffset];
+            
+            gsap.to("#weekly-posts-container", {
+                opacity: 0,
+                y: -15,
+                duration: 0.25,
+                ease: "power2.in",
+                onComplete: () => {
+                    renderWeeklyPosts();
+                    gsap.fromTo("#weekly-posts-container", 
+                        { opacity: 0, y: 20 },
+                        { opacity: 1, y: 0, duration: 0.45, ease: "power3.out" }
+                    );
+                }
+            });
+        }
+
+        // Navigate between weeks on Le Labo sources
+        function navigateLabWeek(direction) {
+            const newOffset = currentLabWeekOffset + direction;
+            if (newOffset < -2 || newOffset > 0) return;
+            
+            currentLabWeekOffset = newOffset;
+            
+            const btnNext = document.getElementById('btn-next-lab-week');
+            if (currentLabWeekOffset === 0) {
+                btnNext.classList.add('opacity-40', 'cursor-not-allowed');
+                btnNext.disabled = true;
+            } else {
+                btnNext.classList.remove('opacity-40', 'cursor-not-allowed');
+                btnNext.disabled = false;
+            }
+            
+            const weekTitles = {
+                0: "Cette semaine",
+                "-1": "La semaine dernière",
+                "-2": "Il y a 2 semaines"
+            };
+            
+            document.getElementById('lab-week-display-title').innerText = weekTitles[currentLabWeekOffset];
+            
+            // Re-render lab sources with smooth animation
+            gsap.to(["#lab-news-container", "#lab-influences-container"], {
+                opacity: 0,
+                x: -10,
+                duration: 0.2,
+                stagger: 0.05,
+                ease: "power2.in",
+                onComplete: () => {
+                    renderLabSources();
+                    gsap.fromTo(["#lab-news-container", "#lab-influences-container"], 
+                        { opacity: 0, x: 10 },
+                        { opacity: 1, x: 0, duration: 0.35, stagger: 0.05, ease: "power3.out" }
+                    );
+                }
+            });
+        }
+
+        // Render dynamic scrollable elements inside the Lab (News & Network)
+        function renderLabSources() {
+            const newsContainer = document.getElementById('lab-news-container');
+            const influencesContainer = document.getElementById('lab-influences-container');
+            
+            if (!newsContainer || !influencesContainer) return;
+            
+            newsContainer.innerHTML = "";
+            influencesContainer.innerHTML = "";
+            
+            const sources = labSourcesData[currentLabWeekOffset] || { news: [], influences: [] };
+            
+            // 1. Render News
+            if (sources.news.length === 0) {
+                newsContainer.innerHTML = `<div class="p-6 text-center text-slate-400 font-medium text-xs">Aucune news archivée.</div>`;
+            } else {
+                sources.news.forEach(newsItem => {
+                    const card = document.createElement('div');
+                    card.id = newsItem.id;
+                    card.className = "draggable-item bg-slate-50 hover:bg-slate-100 border border-slate-200 p-3.5 rounded-xl transition-all shadow-sm relative pr-10 group";
+                    card.setAttribute('draggable', 'true');
+                    card.setAttribute('ondragstart', 'drag(event)');
+                    
+                    card.innerHTML = `
+                        <!-- Source Brand identity and Category -->
+                        <div class="flex items-center justify-between mb-2">
+                            <div class="flex items-center gap-1.5 overflow-hidden">
+                                <span class="w-5 h-5 rounded-md bg-white border border-slate-200 shadow-sm flex items-center justify-center text-xs shrink-0">${newsItem.logo}</span>
+                                <span class="text-xs font-bold text-slate-600 truncate">${newsItem.origin}</span>
+                            </div>
+                            <span class="text-[9px] font-extrabold text-primary bg-indigo-50 px-2 py-0.5 rounded-md shrink-0 uppercase tracking-wider">${newsItem.category}</span>
+                        </div>
+                        
+                        <p class="text-sm font-semibold text-slate-700 leading-tight">${newsItem.title}</p>
+                        
+                        <!-- Mini Link button -->
+                        <a href="${newsItem.url}" target="_blank" onclick="event.stopPropagation(); showToast('Redirection vers ${newsItem.origin}...')" class="absolute top-3 right-3 w-6 h-6 rounded-md hover:bg-white border border-transparent hover:border-slate-200 text-slate-400 hover:text-primary flex items-center justify-center transition-all" title="Consulter la source d'origine">
+                            <i class="fa-solid fa-arrow-up-right-from-square text-[10px]"></i>
+                        </a>
+                    `;
+                    newsContainer.appendChild(card);
+                });
+            }
+            
+            // 2. Render Network Influences
+            if (sources.influences.length === 0) {
+                influencesContainer.innerHTML = `<div class="p-6 text-center text-slate-400 font-medium text-xs">Aucune inspiration archivée.</div>`;
+            } else {
+                sources.influences.forEach(infItem => {
+                    const card = document.createElement('div');
+                    card.id = infItem.id;
+                    card.className = "draggable-item bg-slate-50 hover:bg-slate-100 border border-slate-200 p-3.5 rounded-xl transition-all shadow-sm relative pr-10 group";
+                    card.setAttribute('draggable', 'true');
+                    card.setAttribute('ondragstart', 'drag(event)');
+                    
+                    card.innerHTML = `
+                        <!-- Brand Identity / Profile Monogram -->
+                        <div class="flex items-center justify-between mb-2">
+                            <div class="flex items-center gap-2 overflow-hidden">
+                                <div class="w-5 h-5 rounded-full bg-indigo-100 flex items-center justify-center text-[10px] font-bold text-primary shrink-0">${infItem.logo}</div>
+                                <span class="text-xs font-bold text-slate-600 truncate">${infItem.user}</span>
+                            </div>
+                            <span class="text-[10px] text-slate-400 font-bold shrink-0">${infItem.tag}</span>
+                        </div>
+                        
+                        <p class="text-xs font-semibold text-slate-600 leading-relaxed italic">"${infItem.text}"</p>
+                        
+                        <!-- Mini Link button -->
+                        <a href="${infItem.url}" target="_blank" onclick="event.stopPropagation(); showToast('Ouverture du profil de ${infItem.user}...')" class="absolute top-3 right-3 w-6 h-6 rounded-md hover:bg-white border border-transparent hover:border-slate-200 text-slate-400 hover:text-primary flex items-center justify-center transition-all" title="Consulter le profil LinkedIn">
+                            <i class="fa-solid fa-arrow-up-right-from-square text-[10px]"></i>
+                        </a>
+                    `;
+                    influencesContainer.appendChild(card);
+                });
+            }
+
+            // Sync Mockup Edit Mode styles if active
+            if (editModeActive) {
+                setTimeout(applyEditModeStyles, 100);
+            }
+        }
+
+        function renderWeeklyPosts() {
+            const container = document.getElementById('weekly-posts-container');
+            if (!container) return;
+            
+            container.innerHTML = "";
+            const posts = weeklyData[currentWeekOffset] || [];
+            
+            if (posts.length === 0) {
+                container.innerHTML = `<div class="bg-white p-8 rounded-2xl border border-slate-200 text-center text-slate-400 font-bold shadow-soft">Aucun post disponible pour cette semaine.</div>`;
+                return;
+            }
+            
+            posts.forEach(post => {
+                const card = document.createElement('div');
+                card.id = `card-${post.id}`;
+                
+                // Styling classes according to status
+                let borderClass = "border-slate-100";
+                let badgeHTML = "";
+                let bannerHTML = "";
+                let bgClass = "bg-white";
+                let opacityClass = "opacity-100";
+                let footerHTML = "";
+                
+                let isEditable = !post.published && !post.isExpired;
+                let editableAttr = isEditable ? `contenteditable="true" oninput="handleWeeklyTextChange('${post.id}')"` : '';
+                let editableClasses = isEditable ? 'focus:outline-none focus:ring-2 focus:ring-primary/20 focus:bg-slate-50/50 p-2.5 rounded-xl border border-transparent focus:border-slate-200 transition-all cursor-text' : '';
+
+                if (post.published) {
+                    borderClass = "border-emerald-200 shadow-md ring-1 ring-emerald-50";
+                    bgClass = "bg-gradient-to-b from-emerald-50/10 to-white";
+                    bannerHTML = `
+                        <div class="px-5 py-2.5 bg-emerald-500 text-white flex items-center justify-between text-xs font-bold uppercase tracking-wider">
+                            <span><i class="fa-solid fa-circle-check mr-1.5 animate-pulse"></i> Publié sur LinkedIn</span>
+                            <span>Validé par vous</span>
+                        </div>`;
+                    badgeHTML = `
+                        <span class="text-xs font-extrabold text-emerald-600 bg-emerald-50 px-3 py-1.5 rounded-xl border border-emerald-100 uppercase tracking-wider flex items-center gap-1.5">
+                            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span> Historique Actif
+                        </span>`;
+                    footerHTML = `
+                        <div class="p-4 border-t border-slate-50 flex flex-wrap gap-3 justify-between items-center bg-slate-50/40">
+                            <span class="text-xs font-bold text-slate-400 ml-2"><i class="fa-solid fa-clock mr-1"></i> Partagé en Juin 2026</span>
+                            <div class="flex gap-2">
+                                <button onclick="showToast('Ouverture simulée du post LinkedIn...')" class="flex items-center gap-2 text-slate-600 hover:text-slate-800 hover:bg-slate-200 bg-slate-100 px-4 py-2.5 rounded-xl font-bold transition-all text-sm">
+                                    <i class="fa-brands fa-linkedin text-[#0A66C2]"></i> Voir sur LinkedIn
+                                </button>
+                                <button onclick="navigator.clipboard.writeText(\`${post.text.replace(/`/g, '\\`').replace(/'/g, "\\'")}\`); showToast('Texte copié de nouveau !')" class="flex items-center gap-2 text-primary hover:bg-indigo-50 px-4 py-2.5 rounded-xl font-bold transition-all text-sm">
+                                    <i class="fa-regular fa-copy"></i> Recopier
+                                </button>
+                            </div>
+                        </div>`;
+                } else if (post.isExpired) {
+                    borderClass = "border-slate-200 shadow-sm";
+                    bgClass = "bg-slate-50/50";
+                    opacityClass = "opacity-65 hover:opacity-100 transition-opacity duration-300";
+                    bannerHTML = `
+                        <div class="px-5 py-2 bg-slate-400 text-white flex items-center justify-between text-xs font-bold uppercase tracking-wider">
+                            <span><i class="fa-solid fa-clock-rotate-left mr-1.5"></i> Opportunité passée</span>
+                            <span>Expiré</span>
+                        </div>`;
+                    badgeHTML = `
+                        <span class="text-xs font-extrabold text-slate-400 bg-slate-100 px-3 py-1.5 rounded-xl uppercase tracking-wider">
+                            Non exploité
+                        </span>`;
+                    footerHTML = `
+                        <div class="p-4 border-t border-slate-100 flex flex-wrap gap-3 justify-end items-center bg-slate-100/30">
+                            <button onclick="recoveryToLab('${post.id}')" class="flex items-center gap-2 bg-slate-900 hover:bg-slate-800 text-white px-5 py-2.5 rounded-xl font-bold transition-all text-sm transform hover:-translate-y-0.5">
+                                <i class="fa-solid fa-arrows-spin"></i> Récupérer dans Le Labo
+                            </button>
+                        </div>`;
+                } else {
+                    if (post.type === 'reseau') {
+                        borderClass = "border-indigo-100 shadow-soft relative";
+                    } else {
+                        borderClass = "border-slate-100 shadow-soft";
+                    }
+                    badgeHTML = `
+                        <span class="text-xs font-bold ${post.type === 'reseau' ? 'text-primary' : 'text-slate-500'} uppercase tracking-wider flex items-center gap-2">
+                            <span class="w-2 h-2 rounded-full ${post.type === 'reseau' ? 'bg-secondary' : 'bg-primary'}"></span> ${post.category}
+                        </span>`;
+                    footerHTML = `
+                        <div class="p-4 border-t border-slate-50 flex flex-wrap gap-3 justify-end items-center">
+                            <button onclick="showToast('Génération d\\'une nouvelle version en cours...')" class="flex items-center gap-2 text-slate-500 hover:text-primary hover:bg-indigo-50 px-4 py-2.5 rounded-xl font-bold transition-all text-sm">
+                                <i class="fa-solid fa-arrows-rotate"></i> Autre angle
+                            </button>
+                            <button onclick="openEditor('text-${post.id}')" class="flex items-center gap-2 text-slate-500 hover:text-slate-800 hover:bg-slate-100 px-4 py-2.5 rounded-xl font-bold transition-all text-sm">
+                                <i class="fa-regular fa-pen-to-square"></i> Focus
+                            </button>
+                            <button onclick="triggerPublishModal('${post.title.replace(/'/g, "\\'")}', 'text-${post.id}', '${post.posture}', '${post.angle}')" class="flex items-center justify-center gap-2 bg-gradient-to-r from-primary to-secondary hover:shadow-glow text-white px-6 py-2.5 rounded-xl font-bold transition-all text-sm transform hover:-translate-y-0.5">
+                                <i class="fa-solid fa-paper-plane"></i> Poster
+                            </button>
+                        </div>`;
+                }
+
+                // Inner content construction
+                card.className = `${opacityClass} ${bgClass} rounded-2xl border ${borderClass} overflow-hidden flex flex-col hover:shadow-lg transition-shadow duration-300`;
+                
+                const isImageActive = post.visualType === 'image' ? '' : 'hidden';
+                const isCarouselActive = post.visualType === 'carousel' ? 'flex' : 'hidden';
+                const isChartActive = post.visualType === 'chart' ? 'flex' : 'hidden';
+                const isQuoteActive = post.visualType === 'quote' ? 'flex' : 'hidden';
+                
+                let selectorHTML = "";
+                if (!post.published && !post.isExpired) {
+                    selectorHTML = `
+                        <div class="absolute top-3 left-3 bg-white/95 backdrop-blur-sm px-2.5 py-1.5 rounded-xl text-xs font-bold text-slate-700 shadow-sm flex items-center gap-2 border border-slate-100 z-20">
+                            <span id="visual-icon-${post.id}" class="flex items-center">
+                                ${post.visualType === 'image' ? '<i class="fa-solid fa-image text-primary"></i>' : ''}
+                                ${post.visualType === 'carousel' ? '<i class="fa-solid fa-layer-group text-secondary"></i>' : ''}
+                                ${post.visualType === 'chart' ? '<i class="fa-solid fa-chart-simple text-amber-500"></i>' : ''}
+                                ${post.visualType === 'quote' ? '<i class="fa-solid fa-quote-left text-rose-500"></i>' : ''}
+                            </span>
+                            <select id="visual-type-${post.id}" onchange="changeVisualType('${post.id}', this.value)" class="bg-transparent text-slate-700 font-extrabold text-[11px] outline-none cursor-pointer pr-1">
+                                <option value="image" ${post.visualType === 'image' ? 'selected' : ''}>🖼️ Image IA suggérée</option>
+                                <option value="carousel" ${post.visualType === 'carousel' ? 'selected' : ''}>📚 Carrousel interactif</option>
+                                <option value="chart" ${post.visualType === 'chart' ? 'selected' : ''}>📊 Graphique & Data</option>
+                                <option value="quote" ${post.visualType === 'quote' ? 'selected' : ''}>💬 Citation stylisée</option>
+                                <option value="none" ${post.visualType === 'none' ? 'selected' : ''}>❌ Aucun visuel</option>
+                            </select>
+                        </div>`;
+                } else {
+                    const labelNames = {
+                        image: "🖼️ Image IA",
+                        carousel: "📚 Carrousel interactif",
+                        chart: "📊 Graphique sectoriel",
+                        quote: "💬 Citation stylisée",
+                        none: "Aucun visuel"
+                    };
+                    selectorHTML = `
+                        <div class="absolute top-3 left-3 bg-white/95 backdrop-blur-sm px-3 py-1.5 rounded-xl text-[10px] font-extrabold text-slate-500 uppercase tracking-widest shadow-sm border border-slate-100 z-20">
+                            Format : ${labelNames[post.visualType] || 'Inconnu'}
+                        </div>`;
+                }
+
+                card.innerHTML = `
+                    ${bannerHTML}
+                    <div class="px-5 py-3.5 border-b border-slate-50 flex justify-between items-center bg-gradient-to-r from-slate-50 to-white">
+                        ${badgeHTML}
+                        <span class="text-xs font-medium text-slate-400 bg-slate-100 px-2.5 py-1 rounded-md">${post.dateLabel}</span>
+                    </div>
+                    <div class="p-6 flex-1 text-[15px] text-slate-700 leading-relaxed font-medium">
+                        
+                        <!-- Text area wrapper -->
+                        <div class="relative">
+                            <div id="text-${post.id}" ${editableAttr} class="${editableClasses} whitespace-pre-line post-content-container">
+                                ${post.text}
+                            </div>
+                            
+                            ${isEditable ? `
+                            <div class="flex justify-between items-center mt-3 pt-2 border-t border-slate-50 text-[11px] text-slate-400 font-semibold px-1">
+                                <span class="flex items-center gap-1.5"><i class="fa-solid fa-pen text-slate-300"></i> Zone modifiable en direct</span>
+                                <span id="word-count-${post.id}" class="bg-indigo-50 text-primary px-2 py-0.5 rounded-md font-bold">${countWords(post.text)} mots</span>
+                            </div>` : ''}
+                        </div>
+                        
+                        <!-- Visuel suggéré -->
+                        <div id="visual-container-${post.id}" class="mt-5 rounded-2xl overflow-hidden border border-slate-200 relative group transition-all duration-300">
+                            ${selectorHTML}
+
+                            <div id="visual-${post.id}-image" class="${isImageActive} w-full h-56">
+                                <img src="https://images.unsplash.com/photo-1620712943543-bcc4688e7485?q=80&w=800&auto=format&fit=crop" alt="Visuel suggéré" class="w-full h-56 object-cover transition-transform duration-700 group-hover:scale-105">
+                            </div>
+
+                            <div id="visual-${post.id}-carousel" class="${isCarouselActive} w-full h-56 bg-gradient-to-br from-indigo-50 to-purple-50 flex-col justify-between p-5 relative">
+                                <div class="absolute inset-0 opacity-[0.03]" style="background-image: radial-gradient(#4F46E5 2px, transparent 2px); background-size: 20px 20px;"></div>
+                                <div class="flex-1 flex flex-col justify-center items-center text-center px-6 relative z-10">
+                                    <span class="text-[9px] font-bold text-primary bg-indigo-100/70 px-2 py-0.5 rounded-full uppercase tracking-wider mb-2">Slide 1 / 3</span>
+                                    <h4 class="font-extrabold text-slate-800 text-base tracking-tight max-w-sm">${post.title}</h4>
+                                    <p class="text-xs text-slate-500 mt-1 max-w-xs">Calibré pour votre audience de dirigeants.</p>
+                                </div>
+                                <div class="flex justify-center gap-1.5 pb-2">
+                                    <span class="w-2 h-2 rounded-full bg-primary"></span>
+                                    <span class="w-2 h-2 rounded-full bg-slate-300"></span>
+                                    <span class="w-2 h-2 rounded-full bg-slate-300"></span>
+                                </div>
+                            </div>
+
+                            <div id="visual-${post.id}-chart" class="${isChartActive} w-full h-56 bg-slate-900 text-white flex-col justify-between p-5 relative">
+                                <div class="flex-1 flex flex-col justify-center items-center">
+                                    <span class="text-xs text-slate-400 font-bold mb-3 uppercase tracking-wider">${post.title}</span>
+                                    <div class="flex items-end gap-6 h-24 pb-2 w-full max-w-xs justify-center">
+                                        <div class="flex flex-col items-center gap-1.5 w-12">
+                                            <span class="text-xs font-bold text-slate-400">22%</span>
+                                            <div class="w-8 bg-slate-700 rounded-t-md h-8"></div>
+                                            <span class="text-[10px] text-slate-500 font-bold">Subir</span>
+                                        </div>
+                                        <div class="flex flex-col items-center gap-1.5 w-12">
+                                            <span class="text-xs font-bold text-primary">78%</span>
+                                            <div class="w-8 bg-gradient-to-t from-primary to-secondary rounded-t-md h-20"></div>
+                                            <span class="text-[10px] text-primary font-bold font-sans">Anticiper</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div id="visual-${post.id}-quote" class="${isQuoteActive} w-full h-56 bg-gradient-to-br from-primary via-indigo-600 to-secondary text-white flex-col justify-between p-6 relative">
+                                <div class="absolute top-4 right-6 text-6xl opacity-20 font-serif">”</div>
+                                <div class="flex-1 flex flex-col justify-center px-4">
+                                    <p class="text-base font-extrabold leading-relaxed italic">"Arrêtez de vendre des fonctionnalités. Vos clients achètent de la sérénité."</p>
+                                    <p class="text-xs opacity-70 mt-3 font-semibold">— Équipe Narro AI</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    ${footerHTML}
+                `;
+                
+                container.appendChild(card);
+            });
+
+            // Sync Mockup Edit Mode styles if active
+            if (editModeActive) {
+                setTimeout(applyEditModeStyles, 100);
+            }
+        }
+
+        function recoveryToLab(postId) {
+            const postObj = weeklyData[currentWeekOffset].find(p => p.id === postId);
+            if (!postObj) return;
+
+            // Open "Le Labo" view
+            switchTab('yourposts');
+            
+            // Set input settings based on post
+            document.getElementById('bucket-angle-input').value = `Inspiré de : ${postObj.title}`;
+            selectedAngle = `Inspiré de : ${postObj.title}`;
+            
+            showToast("Opportunité récupérée ! Utilisez Le Labo d'assemblage pour lui donner une nouvelle vie.");
+        }
+
+        // DOM Loaded Init
+        document.addEventListener("DOMContentLoaded", (event) => {
+            // Activate the first view initially
+            const firstTab = document.getElementById('view-weekly');
+            firstTab.style.display = 'block';
+            firstTab.classList.add('active');
+            
+            const firstNav = document.getElementById('nav-weekly');
+            if(firstNav) {
+                firstNav.classList.remove('text-slate-500', 'hover:text-slate-900', 'hover:bg-slate-50');
+                firstNav.classList.add('bg-indigo-50', 'text-primary');
+                const firstIcon = firstNav.querySelector('i');
+                if(firstIcon) {
+                    firstIcon.classList.remove('text-slate-400');
+                    firstIcon.classList.add('text-primary');
+                }
+            }
+
+            renderWeeklyPosts();
+            renderLabSources();
+
+            gsap.from("#view-weekly .section-anim", {
+                y: 30,
+                opacity: 0,
+                duration: 0.6,
+                stagger: 0.1,
+                ease: "power3.out"
+            });
+
+            renderHistoryTable();
+            updateStrategyTracker();
+        });
+
+        // Tab Switching Logic with GSAP
+        function switchTab(tabId) {
+            if (document.getElementById('view-' + tabId).classList.contains('active')) return;
+
+            const currentActive = document.querySelector('.view-section.active');
+            
+            if(currentActive) {
+                gsap.to(currentActive, {
+                    opacity: 0,
+                    y: -10,
+                    duration: 0.2,
+                    ease: "power2.in",
+                    onComplete: () => {
+                        currentActive.style.display = 'none';
+                        currentActive.classList.remove('active');
+                        showNewTab(tabId);
+                    }
+                });
+            } else {
+                showNewTab(tabId);
+            }
+
+            // Reset navigation item classes
+            document.querySelectorAll('.nav-item').forEach(el => {
+                el.classList.remove('bg-indigo-50', 'text-primary');
+                el.classList.add('text-slate-500', 'hover:text-slate-900', 'hover:bg-slate-50');
+                const icon = el.querySelector('i');
+                if(icon) {
+                    icon.classList.remove('text-primary');
+                    icon.classList.add('text-slate-400');
+                }
+            });
+            
+            // Apply active styles to the selected tab
+            const activeNav = document.getElementById('nav-' + tabId);
+            if(activeNav) {
+                activeNav.classList.remove('text-slate-500', 'hover:text-slate-900', 'hover:bg-slate-50');
+                activeNav.classList.add('bg-indigo-50', 'text-primary');
+                const icon = activeNav.querySelector('i');
+                if(icon) {
+                    icon.classList.remove('text-slate-400');
+                    icon.classList.add('text-primary');
+                }
+            }
+        }
+
+        function showNewTab(tabId) {
+            const targetView = document.getElementById('view-' + tabId);
+            targetView.style.display = 'block';
+            targetView.classList.add('active');
+            
+            gsap.set(targetView, {opacity: 1});
+
+            if (tabId === 'weekly') {
+                renderWeeklyPosts();
+            } else if (tabId === 'yourposts') {
+                renderLabSources();
+            } else if (tabId === 'analytics') {
+                updateStrategyTracker();
+                renderHistoryTable();
+            }
+
+            gsap.fromTo(targetView.querySelectorAll('.section-anim'), 
+                { y: 30, opacity: 0 },
+                { y: 0, opacity: 1, duration: 0.5, stagger: 0.08, ease: "power3.out" }
+            );
+
+            // Synchronize edit mode styles if active
+            if (editModeActive) {
+                setTimeout(applyEditModeStyles, 100);
+            }
+        }
+
+        function openEditor(elementId) {
+            const el = document.getElementById(elementId);
+            if (el) {
+                el.focus();
+                
+                // Put cursor at the very end of editable text dynamically
+                const range = document.createRange();
+                const sel = window.getSelection();
+                range.selectNodeContents(el);
+                range.collapse(false);
+                sel.removeAllRanges();
+                sel.addRange(range);
+                
+                showToast("Édition directe activée dans le bloc ! Modifiez à votre guise.");
+            }
+        }
+
+        function fillGenerator(type, btnElement) {
+            // Cancel active form selections if edit mode is active
+            if (editModeActive) return;
+
+            document.querySelectorAll('.template-btn').forEach(btn => {
+                btn.classList.remove('border-primary', 'ring-2', 'ring-primary', 'shadow-md');
+                btn.classList.add('border-slate-100');
+            });
+            btnElement.classList.remove('border-slate-100');
+            btnElement.classList.add('border-primary', 'ring-2', 'ring-primary', 'shadow-md');
+
+            const label1 = document.getElementById('label-q1');
+            const input1 = document.getElementById('input-q1');
+            const label2 = document.getElementById('label-q2');
+            const input2 = document.getElementById('input-q2');
+
+            if(type === 'event') {
+                label1.innerText = "1. Quel était l'événement ?";
+                input1.value = "Salon Vivatech à Paris";
+                label2.innerText = "2. Quelle est votre idée principale ?";
+                input2.value = "Beaucoup d'IA, peu de concret industriel.";
+            } else if (type === 'succes') {
+                label1.innerText = "1. Quelle est la bonne nouvelle ?";
+                input1.value = "Signature d'un gros contrat avec le groupe XYZ";
+                label2.innerText = "2. Pourquoi est-ce important ?";
+                input2.value = "Fierté des équipes après 6 mois d'efforts intenses.";
+            } else if (type === 'opinion') {
+                label1.innerText = "1. Sur quel sujet voulez-vous réagir ?";
+                input1.value = "Le retour au bureau forcé";
+                label2.innerText = "2. Quelle est votre position ?";
+                input2.value = "C'est un aveu de faiblesse managériale. La confiance prime.";
+            } else if (type === 'recrutement') {
+                label1.innerText = "1. Quel poste cherchez-vous ?";
+                input1.value = "Lead Developer Senior";
+                label2.innerText = "2. Pourquoi vous rejoindre ?";
+                input2.value = "Projet from scratch, équipe autonome, vrai impact.";
+            } else if (type === 'apprentissage') {
+                label1.innerText = "1. Quelle erreur avez-vous commise ?";
+                input1.value = "Lancement trop tardif de notre dernier module";
+                label2.innerText = "2. Qu'en avez-vous retenu ?";
+                input2.value = "Mieux vaut un produit imparfait qu'un produit fantôme.";
+            } else if (type === 'coulisses') {
+                label1.innerText = "1. Que partagez-vous aujourd'hui ?";
+                input1.value = "Le séminaire de l'équipe fondatrice";
+                label2.innerText = "2. Quelle est l'ambiance ?";
+                input2.value = "Beaucoup de fatigue mais un alignement total sur la vision.";
+            } else if (type === 'equipe') {
+                label1.innerText = "1. Qui mettez-vous en avant ?";
+                input1.value = "Sarah, notre Directrice Commerciale";
+                label2.innerText = "2. Pourquoi mérite-t-elle ce post ?";
+                input2.value = "Elle a sauvé un compte clé en gérant une crise ce week-end.";
+            } else if (type === 'lancement') {
+                label1.innerText = "1. Qu'annoncez-vous ?";
+                input1.value = "L'ouverture publique de notre API V2";
+                label2.innerText = "2. Quel problème cela résout-il ?";
+                input2.value = "Nos clients peuvent enfin intégrer nos données partout en 2 clics.";
+            } else if (type === 'gueule') {
+                label1.innerText = "1. Qu'est-ce qui vous agace ?";
+                input1.value = "Le greenwashing ambiant dans la Tech";
+                label2.innerText = "2. Quelle est votre alternative ?";
+                input2.value = "Mesurer sérieusement l'impact carbone des serveurs et l'afficher.";
+            }
+            
+            const placeholder = document.getElementById('gen-placeholder');
+            const result = document.getElementById('gen-result');
+            
+            result.style.display = 'none';
+            placeholder.style.display = 'flex';
+            gsap.fromTo(placeholder, {opacity: 0, scale: 0.95}, {opacity: 1, scale: 1, duration: 0.3});
+        }
+
+        // Easy Post Tone Handler
+        function setEasyPostTone(button) {
+            if (editModeActive) return;
+            
+            document.querySelectorAll('#easypost-tone-selector .tone-btn').forEach(btn => {
+                btn.className = "tone-btn px-5 py-2.5 rounded-xl border-2 border-slate-100 hover:border-slate-200 hover:bg-slate-50 text-slate-500 text-sm font-bold transition-all";
+            });
+            button.className = "tone-btn px-5 py-2.5 rounded-xl border-2 border-primary bg-indigo-50 text-primary text-sm font-bold shadow-sm";
+        }
+
+        // AI Generation Simulation for Easy Post
+        function simulateGeneration() {
+            if (editModeActive) return;
+
+            const btn = document.getElementById('btn-generate');
+            const originalText = btn.innerHTML;
+            
+            btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin text-amber-400"></i> Rédaction en cours...';
+            btn.classList.add('opacity-90', 'cursor-not-allowed', 'scale-95');
+            
+            setTimeout(() => {
+                btn.innerHTML = originalText;
+                btn.classList.remove('opacity-90', 'cursor-not-allowed', 'scale-95');
+                
+                const placeholder = document.getElementById('gen-placeholder');
+                const result = document.getElementById('gen-result');
+                
+                placeholder.style.display = 'none';
+                result.style.display = 'flex';
+                
+                updateEasyPostWordCount();
+                
+                gsap.fromTo(result, 
+                    {opacity: 0, y: 20}, 
+                    {opacity: 1, y: 0, duration: 0.5, ease: "back.out(1.2)"}
+                );
+                
+                showToast('Votre post est prêt ! Vous pouvez l\'éditer directement.');
+            }, 1200); 
+        }
+
+        // Drag & Drop Mechanics
+        function allowDrop(ev) {
+            ev.preventDefault();
+            document.getElementById('drop-bucket').classList.add('drag-over');
+        }
+
+        function leaveDrop(ev) {
+            document.getElementById('drop-bucket').classList.remove('drag-over');
+        }
+
+        function drag(ev) {
+            ev.dataTransfer.setData("text", ev.target.id);
+            ev.target.style.opacity = '0.4';
+        }
+
+        document.addEventListener('dragend', function(ev) {
+            if (ev.target && ev.target.classList && ev.target.classList.contains('draggable-item')) {
+                ev.target.style.opacity = '1';
+            }
+        });
+
+        function drop(ev) {
+            ev.preventDefault();
+            const bucket = document.getElementById('drop-bucket');
+            bucket.classList.remove('drag-over');
+
+            var data = ev.dataTransfer.getData("text");
+            var originalElement = document.getElementById(data);
+
+            if (originalElement) {
+                originalElement.style.opacity = '1';
+                
+                const placeholder = document.getElementById('bucket-placeholder');
+                if(placeholder) placeholder.style.display = 'none';
+
+                var nodeCopy = originalElement.cloneNode(true);
+                nodeCopy.id = "dropped-" + Date.now();
+                nodeCopy.removeAttribute('draggable');
+                nodeCopy.ondragstart = null;
+                
+                // Redimensionner et nettoyer le bouton "consulter source" du bloc glissé
+                const linkBtn = nodeCopy.querySelector('a');
+                if (linkBtn) linkBtn.remove();
+                
+                nodeCopy.className = "bg-slate-800/80 border border-slate-600 px-4 py-2.5 rounded-xl relative pr-8 text-slate-200 shadow-md backdrop-blur-sm flex items-center gap-2 max-w-xs transition-all";
+                
+                const texts = nodeCopy.querySelectorAll('.text-slate-700, .text-slate-600');
+                texts.forEach(t => {
+                    t.classList.remove('text-slate-700', 'text-slate-600');
+                    t.classList.add('text-slate-300');
+                });
+
+                const removeBtn = document.createElement('button');
+                removeBtn.innerHTML = '<i class="fa-solid fa-times"></i>';
+                removeBtn.className = "absolute top-1 right-1 text-slate-500 hover:text-rose-400 w-5 h-5 flex items-center justify-center rounded-full hover:bg-slate-700 transition-colors";
+                removeBtn.onclick = function() {
+                    nodeCopy.remove();
+                    if(bucket.querySelectorAll('div[id^="dropped-"]').length === 0) {
+                        if(placeholder) placeholder.style.display = 'flex';
+                        document.getElementById('btn-generate-bucket').classList.add('hidden');
+                    }
+                };
+                nodeCopy.appendChild(removeBtn);
+
+                bucket.appendChild(nodeCopy);
+                
+                document.getElementById('btn-generate-bucket').classList.remove('hidden');
+                
+                gsap.fromTo(nodeCopy, {scale: 0.8, opacity: 0}, {scale: 1, opacity: 1, duration: 0.3, ease: "back.out(1.5)"});
+            }
+        }
+
+        // Angle Selection Controls
+        function selectAngle(angleText, element) {
+            if (editModeActive) return;
+            
+            document.getElementById('bucket-angle-input').value = angleText;
+            selectedAngle = angleText;
+            
+            document.querySelectorAll('.angle-preset').forEach(btn => {
+                btn.classList.remove('border-primary', 'text-primary', 'bg-indigo-50/50');
+                btn.classList.add('border-slate-200', 'text-slate-500', 'bg-white');
+            });
+            element.classList.remove('border-slate-200', 'text-slate-500', 'bg-white');
+            element.classList.add('border-primary', 'text-primary', 'bg-indigo-50/50');
+            showToast(`Angle d'attaque sélectionné : ${angleText}`);
+        }
+
+        // Posture Selection Controls
+        function selectPosture(postureKey, element) {
+            if (editModeActive) return;
+            
+            selectedPosture = postureKey;
+            
+            const labels = {
+                'opinion': 'Opinion personnelle',
+                'analyse': 'Analyse marché',
+                'retour': 'Retour d\'expérience',
+                'conseil': 'Conseil pratique'
+            };
+            selectedPostureLabel = labels[postureKey];
+
+            document.querySelectorAll('.posture-btn').forEach(btn => {
+                btn.classList.remove('border-primary', 'bg-indigo-50/50', 'text-primary');
+                btn.classList.add('border-slate-100', 'text-slate-600', 'bg-transparent');
+            });
+
+            element.classList.remove('border-slate-100', 'text-slate-600', 'bg-transparent');
+            element.classList.add('border-primary', 'bg-indigo-50/50', 'text-primary');
+            showToast(`Posture sélectionnée : ${selectedPostureLabel}`);
+        }
+
+        // Post Length Controls
+        function selectLength(lengthValue, element) {
+            if (editModeActive) return;
+            
+            selectedLength = lengthValue;
+
+            document.querySelectorAll('.length-btn').forEach(btn => {
+                btn.classList.remove('border-primary', 'bg-indigo-50', 'text-primary');
+                btn.classList.add('border-slate-100', 'text-slate-500');
+            });
+
+            element.classList.remove('border-slate-100', 'text-slate-500');
+            element.classList.add('border-primary', 'bg-indigo-50', 'text-primary');
+            showToast(`Longueur choisie : ${lengthValue.charAt(0).toUpperCase() + lengthValue.slice(1)}`);
+        }
+
+        // Mix Generation Simulator
+        function simulateBucketGeneration() {
+            if (editModeActive) return;
+
+            const btn = document.getElementById('btn-generate-bucket');
+            const originalContent = btn.innerHTML;
+            
+            btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Mixage & Rédaction par l\'IA...';
+            btn.classList.add('opacity-80', 'cursor-not-allowed', 'scale-95');
+            
+            const customAngle = document.getElementById('bucket-angle-input').value || "aucun angle imposé";
+            
+            setTimeout(() => {
+                btn.innerHTML = originalContent;
+                btn.classList.remove('opacity-80', 'cursor-not-allowed', 'scale-95');
+                
+                const result = document.getElementById('bucket-result');
+                const resultTitle = document.getElementById('bucket-result-title');
+                const resultSubtitle = document.getElementById('bucket-result-subtitle');
+                const resultText = document.getElementById('bucket-result-text');
+                
+                resultTitle.innerText = "Le post issu de votre assemblage";
+                resultSubtitle.innerText = `Posture : ${selectedPostureLabel} • Angle d'attaque : "${customAngle}" • Longueur : ${selectedLength.toUpperCase()}`;
+                
+                let simulatedPost = "";
+                if (selectedPosture === 'opinion') {
+                    simulatedPost = `La régulation de l'IA (AI Act) votée en Europe fait trembler la tech. Mon opinion ? C'est un faux problème. Comme le soulignait très justement @MarcSimon, notre combat est ailleurs. \n\nL'angle choisi ("${customAngle}") le montre bien : arrêtons de chercher des hacks de productivité court-termistes et bâtissons des cultures d'entreprise résilientes. L'asynchrone est le vrai levier, pas la micro-optimisation.`;
+                } else if (selectedPosture === 'analyse') {
+                    simulatedPost = `ANALYSE DU MARCHÉ 📊\n\nEn décortiquant les dernières news de la semaine sur la régulation et la tech, un point clé émerge si on applique l'angle : "${customAngle}".\n\nLe marché européen est en train de se segmenter : d'un côté ceux qui subissent la loi comme une contrainte, de l'autre ceux qui l'utilisent comme un standard de confiance éthique pour surpasser leurs concurrents. Notre positionnement s'inscrit précisément dans cette seconde catégorie.\n\nQu'en pensez-vous ? 👇`;
+                } else if (selectedPosture === 'retour') {
+                    simulatedPost = `Retour d'expérience 🎒\n\nCette semaine, en assemblant les news réglementaires avec les réflexions de @MarcSimon sur l'asynchrone, nous avons fait un test sur nos propres équipes.\n\nNotre angle d'attaque : "${customAngle}". Le résultat après 4 jours ? Une baisse drastique de la charge cognitive et un focus retrouvé. L'asynchrone couplé à une IA éthique n'est pas un mythe, c'est un choix managérial fort que nous documentons ici.\n\n#Management #FuturDuTravail #Asynchrone`;
+                } else {
+                    simulatedPost = `CONSEIL PRATIQUE 💡\n\nVoici comment appliquer concrètement l'angle d'attaque ("${customAngle}") suite à l'actualité réglementaire de cette semaine :\n\n1. Cartographiez vos flux de travail asynchrones.\n2. Limitez l'usage de l'IA aux tâches répétitives de mise en forme.\n3. Protégez le temps profond de vos collaborateurs en limitant les notifications.\n\nEn B2B, l'outil idéal fait gagner du temps libre, rien d'autre.`;
+                }
+
+                if (selectedLength === 'court') {
+                    simulatedPost = simulatedPost.split('\n\n')[0] + "\n\n#IA #Productivite";
+                } else if (selectedLength === 'developpe') {
+                    simulatedPost += "\n\n--- Pour aller plus loin ---\nNous pensons que le cadre réglementaire est une opportunité historique. Les entreprises qui l'intégreront nativement d'ici la fin de l'année 2026 posséderont un avantage concurrentiel indéboulonnable en matière de gouvernance des données. C'est le sens de notre engagement quotidien.";
+                }
+
+                resultText.innerText = simulatedPost;
+                result.classList.remove('hidden');
+                
+                // Update Word count badge dynamically
+                updateBucketWordCount();
+                
+                result.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                
+                gsap.fromTo(result, 
+                    {opacity: 0, y: 20}, 
+                    {opacity: 1, y: 0, duration: 0.5, ease: "power2.out"}
+                );
+                
+                showToast('Votre post mixé et personnalisé est prêt ! Modifiez-le directement si besoin.');
+            }, 1200);
+        }
+
+        // --- MODAL & STRATÉGIE DE PUBLICATION (Narro Assist) ---
+
+        // Configures how many Suggestions are aimed for (1, 2, or 3)
+        function setStrategyFrequency(number, button) {
+            if (editModeActive) return;
+            
+            appState.targetWeeklyPosts = number;
+            
+            document.querySelectorAll('#strategy-count-selector .strat-btn').forEach(btn => {
+                btn.className = "strat-btn flex-1 py-3 rounded-xl border-2 border-slate-100 text-slate-500 text-sm font-bold hover:bg-slate-50 transition-all";
+            });
+            button.className = "strat-btn flex-1 py-3 rounded-xl border-2 border-primary bg-indigo-50 text-primary text-sm font-bold hover:bg-slate-50 transition-all";
+            
+            showToast(`Objectif hebdomadaire synchronisé : ${number} post${number > 1 ? 's' : ''}/semaine`);
+            
+            updateStrategyTracker();
+        }
+
+        // Open the guidance publisher modal with the absolute current text in editable block
+        function triggerPublishModal(title, textElementId, posture, angle) {
+            if (editModeActive) return;
+
+            const textElement = document.getElementById(textElementId);
+            if (!textElement) return;
+
+            // Collect text dynamically to support inline changes made directly by the user!
+            const postContent = textElement.innerText;
+            
+            appState.currentPublishingPost = {
+                title: title,
+                content: postContent,
+                posture: posture || "Opinion",
+                angle: angle || "Général",
+                date: getTodayDateString()
+            };
+
+            const previewContainer = document.getElementById('modal-post-preview');
+            previewContainer.innerText = postContent;
+
+            const modal = document.getElementById('publish-modal');
+            const card = document.getElementById('publish-modal-card');
+            
+            modal.classList.remove('hidden');
+            gsap.fromTo(modal, {opacity: 0}, {opacity: 1, duration: 0.3});
+            gsap.fromTo(card, {scale: 0.95, y: 20}, {scale: 1, y: 0, duration: 0.4, ease: "back.out(1.3)"});
+        }
+
+        // Close Modal
+        function closePublishModal() {
+            const modal = document.getElementById('publish-modal');
+            const card = document.getElementById('publish-modal-card');
+            
+            gsap.to(card, {scale: 0.95, y: 20, duration: 0.25});
+            gsap.to(modal, {
+                opacity: 0, 
+                duration: 0.25, 
+                onComplete: () => {
+                    modal.classList.add('hidden');
+                    appState.currentPublishingPost = null;
+                }
+            });
+        }
+
+        // Copy mechanism using fallback range copy
+        function copyModalPostText() {
+            const previewContainer = document.getElementById('modal-post-preview');
+            
+            const tempTextArea = document.createElement('textarea');
+            tempTextArea.value = previewContainer.innerText;
+            document.body.appendChild(tempTextArea);
+            tempTextArea.select();
+            
+            try {
+                const successful = document.execCommand('copy');
+                if (successful) {
+                    showToast("Texte copié dans le presse-papiers !");
+                } else {
+                    showToast("Erreur de copie. Sélectionnez le texte manuellement.");
+                }
+            } catch (err) {
+                showToast("Votre navigateur a bloqué la copie.");
+            }
+            
+            document.body.removeChild(tempTextArea);
+        }
+
+        // CONFIRMATION of publication
+        function confirmPublication() {
+            if (!appState.currentPublishingPost) return;
+
+            // Push to local published history state
+            const newPost = {
+                id: appState.publishedPosts.length + 1,
+                date: appState.currentPublishingPost.date,
+                title: appState.currentPublishingPost.title,
+                posture: appState.currentPublishingPost.posture,
+                angle: appState.currentPublishingPost.angle,
+                status: "Publié"
+            };
+
+            appState.publishedPosts.unshift(newPost); // Add at top of table
+
+            // Find matching card if it was from the current week pool and flag as published
+            const activeWeeklyPosts = weeklyData[currentWeekOffset] || [];
+            const matchingPost = activeWeeklyPosts.find(p => p.title === appState.currentPublishingPost.title);
+            if (matchingPost) {
+                matchingPost.published = true;
+                matchingPost.dateLabel = `Publié le ${getTodayDateString().split(' ')[0]} ${getTodayDateString().split(' ')[1]}`;
+            }
+
+            showToast("Bravo ! Post ajouté avec succès à votre historique de suivi.");
+            closePublishModal();
+
+            renderWeeklyPosts();
+            updateStrategyTracker();
+            renderHistoryTable();
+        }
+
+        // Get readable date format
+        function getTodayDateString() {
+            const options = { day: '2-digit', month: 'short', year: 'numeric' };
+            return new Date().toLocaleDateString('fr-FR', options);
+        }
+
+        // Update strategy bar calculations
+        function updateStrategyTracker() {
+            const publishedThisWeek = appState.publishedPosts.filter(p => {
+                return p.date.includes("Juin 2026");
+            }).length;
+
+            const target = appState.targetWeeklyPosts;
+            const percent = Math.min(Math.round((publishedThisWeek / target) * 100), 100);
+
+            const titleEl = document.getElementById('analytics-strategy-title');
+            if (titleEl) titleEl.innerText = `Objectif de la semaine : ${target} post${target > 1 ? 's' : ''}`;
+
+            const percentEl = document.getElementById('weekly-progress-percent');
+            if (percentEl) percentEl.innerText = `${percent}%`;
+
+            const labelEl = document.getElementById('strategy-progress-label');
+            if (labelEl) labelEl.innerText = `${publishedThisWeek} post${publishedThisWeek > 1 ? 's' : ''} publié${publishedThisWeek > 1 ? 's' : ''}`;
+
+            const targetEl = document.getElementById('strategy-progress-target');
+            if (targetEl) targetEl.innerText = `Objectif : ${target} post${target > 1 ? 's' : ''}`;
+
+            const progressBar = document.getElementById('strategy-progress-bar');
+            if (progressBar) progressBar.style.width = `${percent}%`;
+        }
+
+        // Render the historical entries in raw HTML safely
+        function renderHistoryTable() {
+            const tbody = document.getElementById('history-table-body');
+            if (!tbody) return;
+
+            tbody.innerHTML = "";
+
+            if (appState.publishedPosts.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="5" class="py-6 text-center text-slate-400 font-medium">Aucun post publié pour le moment.</td></tr>`;
+                return;
+            }
+
+            appState.publishedPosts.forEach(post => {
+                const tr = document.createElement('tr');
+                tr.className = "border-b border-slate-50 hover:bg-slate-50/50 transition-colors";
+                
+                tr.innerHTML = `
+                    <td class="py-4 px-4 font-bold text-slate-800 max-w-xs truncate">${post.title}</td>
+                    <td class="py-4 px-4">
+                        <span class="px-2.5 py-1 bg-indigo-50 text-indigo-600 rounded-lg text-xs font-bold">${post.posture}</span>
+                    </td>
+                    <td class="py-4 px-4 text-slate-500 italic text-xs max-w-xs truncate">${post.angle}</td>
+                    <td class="py-4 px-4 text-slate-400 text-xs">${post.date}</td>
+                    <td class="py-4 px-4 text-right">
+                        <span class="px-2.5 py-1 bg-emerald-50 text-emerald-600 rounded-lg text-xs font-bold inline-flex items-center gap-1.5">
+                            <span class="w-1.5 h-1.5 bg-emerald-500 rounded-full"></span> ${post.status}
+                        </span>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        // Standard dynamic notifications toast system
+        function showToast(message) {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            toast.className = 'toast flex items-center gap-3';
+            toast.innerHTML = `<div class="w-6 h-6 rounded-full bg-gradient-to-r from-primary to-secondary flex items-center justify-center text-white text-xs shadow-sm"><i class="fa-solid fa-check"></i></div> ${message}`;
+            
+            container.appendChild(toast);
+            
+            gsap.fromTo(toast, 
+                { opacity: 0, x: 50 }, 
+                { opacity: 1, x: 0, duration: 0.4, ease: "back.out(1.5)" }
+            );
+            
+            setTimeout(() => {
+                gsap.to(toast, {
+                    opacity: 0, 
+                    x: 50, 
+                    duration: 0.3, 
+                    ease: "power2.in",
+                    onComplete: () => toast.remove()
+                });
+            }, 3000);
+        }
+    </script>
+</body>
+</html>
