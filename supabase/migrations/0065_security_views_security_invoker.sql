@@ -1,4 +1,4 @@
--- 0062 : SÉCURITÉ — security_invoker sur les vues d'administration
+-- 0065 : SÉCURITÉ — security_invoker sur les vues d'administration
 --
 -- Faille corrigée (audit 2026-09-03, bloc A8) : sur PostgreSQL, une VIEW
 -- ignore par défaut la RLS des tables sous-jacentes. Les 3 vues admin

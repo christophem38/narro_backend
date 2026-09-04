@@ -1,4 +1,4 @@
--- 0061 : SÉCURITÉ — ownership check sur narro_seed_progress_plan
+-- 0064 : SÉCURITÉ — ownership check sur narro_seed_progress_plan
 --
 -- Faille corrigée (audit 2026-09-03, bloc A6) : n'importe quel authenticated
 -- pouvait faire `select public.narro_seed_progress_plan('<uuid autre user>')`

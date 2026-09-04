@@ -1,4 +1,4 @@
--- 0063 : SÉCURITÉ — protection des colonnes privilégiées de elocia_profiles
+-- 0066 : SÉCURITÉ — protection des colonnes privilégiées de elocia_profiles
 --
 -- Faille corrigée (audit 2026-09-03, bloc A5) : la policy RLS self_update
 -- autorise `id = auth.uid()`, mais PostgreSQL RLS filtre par ligne, pas
