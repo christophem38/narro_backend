@@ -53,22 +53,23 @@ create index if not exists elocia_improvement_comments_idx
 alter table public.elocia_improvements enable row level security;
 alter table public.elocia_improvement_comments enable row level security;
 
--- Lecture : admins et super-admins voient tout.
+-- Fonctionnalité de développement : réservée aux super-admins.
+-- Lecture : les super-admins voient tout.
 drop policy if exists improvements_read on public.elocia_improvements;
 create policy improvements_read on public.elocia_improvements
   for select to authenticated
-  using (public.narro_current_role() in ('admin','super_admin'));
+  using (public.narro_current_role() = 'super_admin');
 
--- Création : un admin n'écrit qu'en son nom.
+-- Création : on n'écrit qu'en son nom.
 drop policy if exists improvements_insert on public.elocia_improvements;
 create policy improvements_insert on public.elocia_improvements
   for insert to authenticated
   with check (
-    public.narro_current_role() in ('admin','super_admin')
+    public.narro_current_role() = 'super_admin'
     and profile_id = auth.uid()
   );
 
--- Modification (statut, notes de l'agent) : super-admin uniquement.
+-- Modification (statut, notes de l'agent) : super-admin.
 -- L'agent passe par la clé service_role (qui ignore le RLS).
 drop policy if exists improvements_update on public.elocia_improvements;
 create policy improvements_update on public.elocia_improvements
@@ -84,13 +85,13 @@ create policy improvements_delete on public.elocia_improvements
 drop policy if exists improvement_comments_read on public.elocia_improvement_comments;
 create policy improvement_comments_read on public.elocia_improvement_comments
   for select to authenticated
-  using (public.narro_current_role() in ('admin','super_admin'));
+  using (public.narro_current_role() = 'super_admin');
 
 drop policy if exists improvement_comments_insert on public.elocia_improvement_comments;
 create policy improvement_comments_insert on public.elocia_improvement_comments
   for insert to authenticated
   with check (
-    public.narro_current_role() in ('admin','super_admin')
+    public.narro_current_role() = 'super_admin'
     and profile_id = auth.uid()
     and is_agent = false
   );
