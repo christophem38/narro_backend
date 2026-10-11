@@ -1,4 +1,4 @@
--- 0064 : cartes d'action « à faire pour la responsable produit ».
+-- 0069 : cartes d'action « à faire pour la responsable produit ».
 --
 -- L'agent traite seul ce qu'il peut. Quand il a besoin de Marion (valider un plan,
 -- exécuter du SQL, poser une variable, répondre à une question, regarder un
