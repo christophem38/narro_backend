@@ -1,12 +1,10 @@
--- 0081 : V1 — UNE SEULE OFFRE, Solo à 5 € HT / mois (décision du 12/11/2026).
+-- 0081 : V1 — UNE SEULE OFFRE, Solo à 29 € HT / mois (décision du 12/11/2026 ; testeurs à 5 € par code promo Stripe).
 --
 -- Affichage : Solo seule offre visible (Signature et Équipe masquées, pas
 -- supprimées : elles reviendront). Pas d'annuel en V1.
 --
--- PAIEMENT : l'ancien prix Stripe de Solo (29 €) ne doit JAMAIS être facturé
--- sous un affichage à 5 €. On vide donc stripe_price_id : le paiement refuse
--- proprement (« plan non connecté à Stripe ») tant qu'un prix Stripe à 5 € HT
--- n'est pas créé puis renseigné (voir la ligne commentée tout en bas).
+-- PAIEMENT : le prix Stripe de Solo (29 € HT / mois) est CONSERVÉ tel quel. Les
+-- testeurs paient 5 € via un code promotionnel Stripe saisi au paiement.
 --
 -- Comptes : les comptes Signature / Équipe sans abonnement Stripe (essais « maison »
 -- de 0067, démos) passent sur Solo, en conservant leur essai. Un abonnement Stripe
@@ -20,9 +18,8 @@
 update public.elocia_plans set
   label = 'Solo',
   description = 'Du sujet au post planifié, Elocia accompagne chaque étape.',
-  price_eur_monthly = 5,
+  price_eur_monthly = 29,
   price_eur_yearly = null,
-  stripe_price_id = null,
   stripe_price_id_yearly = null,
   trial_days = 7,
   highlights = array[
@@ -45,6 +42,3 @@ update public.elocia_profiles set
 where subscription_tier in ('signature', 'team', 'enterprise')
   and stripe_subscription_id is null
   and role = 'client';
-
--- À EXÉCUTER quand le prix Stripe « Solo 5 € HT / mois » est créé (remplacer l'identifiant) :
--- update public.elocia_plans set stripe_price_id = 'price_XXXXXXXX' where key = 'solo';
